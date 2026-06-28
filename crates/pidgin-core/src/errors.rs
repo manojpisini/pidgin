@@ -18,3 +18,12 @@ pub enum ParseError {
     #[error("empty run_id")]
     EmptyRunId,
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum ValidationError {
+    #[error("syntax error: {0}")]
+    Syntax(String),
+
+    #[error("schema error: {0}")]
+    Schema(String),
+}

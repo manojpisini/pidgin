@@ -1,0 +1,37 @@
+default_deny:
+  - publish
+  - send
+  - delete
+  - secrets
+  - credentials
+  - external_action
+
+private_paths:
+  - ".env"
+  - ".env.*"
+  - "*.key"
+  - "*.pem"
+  - ".git/"
+  - "**/secrets/**"
+  - "**/.ssh/**"
+
+human_required:
+  actions:
+    - publish
+    - send
+    - delete
+    - moderate
+    - credential
+    - promote_memory
+    - external_action
+  risk_levels:
+    - high
+    - crit
+
+block_if:
+  action_in_do_and_deny: true
+  private_path_referenced: true
+  unknown_workflow: true
+  invalid_mode: true
+  missing_required_field: true
+  dangerous_action_without_human: true
