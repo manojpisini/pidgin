@@ -1,0 +1,9 @@
+@run example.task
+wf=generic_review
+mode=draft
+in=[primary_subject,source_refs]
+out=[review_notes]
+do=[draft,review]
+deny=[publish,send,delete,secrets]
+risk=med
+human=yes
