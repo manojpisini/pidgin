@@ -1,20 +1,27 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use clap::{Parser, Subcommand};
-use pidgin_core::context::build_context_plan;
-use pidgin_core::expander::expand_to_run_packet;
-use pidgin_core::logging::{log_event, LogEvent};
-use pidgin_core::metrics::{compare_verbose, estimate_tokens, measure_packet};
-use pidgin_core::parser::parse_packet;
-use pidgin_core::registry::{load_action_registry, load_safety_rules, load_workflow_registry};
-use pidgin_core::resolver::{load_aliases, resolve_all, ResolverContext};
-use pidgin_core::router::{explain_route, route};
-use pidgin_core::safety::check_safety;
-use pidgin_core::validator::syntax::validate_syntax;
-use pidgin_core::validator::schema::validate_schema;
+use pidgin_lang::context::build_context_plan;
+use pidgin_lang::expander::expand_to_run_packet;
+use pidgin_lang::logging::{log_event, LogEvent};
+use pidgin_lang::metrics::{compare_verbose, estimate_tokens, measure_packet};
+use pidgin_lang::parser::parse_packet;
+use pidgin_lang::registry::{load_action_registry, load_safety_rules, load_workflow_registry};
+use pidgin_lang::resolver::{load_aliases, resolve_all, ResolverContext};
+use pidgin_lang::router::{explain_route, route};
+use pidgin_lang::safety::{check_resolved_refs_safety, check_safety};
+use pidgin_lang::validator::syntax::validate_syntax;
+use pidgin_lang::validator::schema::validate_schema;
 
-fn load_pipeline_configs(host: &PathBuf) -> PipelineConfig {
+fn canonicalize_host(host: &Path) -> PathBuf {
+    host.canonicalize().unwrap_or_else(|e| {
+        eprintln!("error: cannot canonicalize host path {}: {}", host.display(), e);
+        std::process::exit(1);
+    })
+}
+
+fn load_pipeline_configs(host: &Path) -> PipelineConfig {
     let config_dir = host.join(".pidgin");
     let workflow_path = config_dir.join("WORKFLOW_REGISTRY.yaml");
     let action_path = config_dir.join("ACTION_REGISTRY.yaml");
@@ -59,10 +66,10 @@ fn load_pipeline_configs(host: &PathBuf) -> PipelineConfig {
 }
 
 struct PipelineConfig {
-    workflows: pidgin_core::registry::WorkflowRegistry,
-    actions: pidgin_core::registry::ActionRegistry,
-    safety_rules: pidgin_core::registry::SafetyRules,
-    aliases: pidgin_core::resolver::ReferenceAliases,
+    workflows: pidgin_lang::registry::WorkflowRegistry,
+    actions: pidgin_lang::registry::ActionRegistry,
+    safety_rules: pidgin_lang::registry::SafetyRules,
+    aliases: pidgin_lang::resolver::ReferenceAliases,
 }
 
 #[derive(Parser)]
@@ -205,7 +212,7 @@ fn main() {
 
         Commands::Check { file, host } => {
             let cfg = load_pipeline_configs(&host);
-            let host_root = host.canonicalize().unwrap_or_else(|_| host.clone());
+            let host_root = canonicalize_host(&host);
             let content = match fs::read_to_string(&file) {
                 Ok(c) => c,
                 Err(e) => {
@@ -238,7 +245,7 @@ fn main() {
                 .fields
                 .get("wf")
                 .and_then(|v| match v {
-                    pidgin_core::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
+                    pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
                     _ => None,
                 })
                 .map(|w| w.required_inputs.clone())
@@ -250,9 +257,18 @@ fn main() {
                 required_inputs,
             };
             let resolved = resolve_all(&packet, &ctx);
+            let resolved_fired = check_resolved_refs_safety(&resolved, &cfg.safety_rules.private_paths);
+            for rule in &resolved_fired {
+                all_errors.push(format!("  [{}] (safety after resolution)", rule));
+            }
             for r in &resolved {
-                if matches!(r.status, pidgin_core::resolver::ResolutionStatus::Unresolved) && r.required {
-                    all_errors.push(format!("  [UNRESOLVED] {} (required)", r.original));
+                if r.required && matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden) {
+                    let label = match r.status {
+                        pidgin_lang::resolver::ResolutionStatus::Unresolved => "UNRESOLVED",
+                        pidgin_lang::resolver::ResolutionStatus::Forbidden => "FORBIDDEN",
+                        _ => "ERROR",
+                    };
+                    all_errors.push(format!("  [{}] {} (required)", label, r.original));
                 }
             }
 
@@ -271,7 +287,7 @@ fn main() {
 
         Commands::Resolve { file, host } => {
             let cfg = load_pipeline_configs(&host);
-            let host_root = host.canonicalize().unwrap_or_else(|_| host.clone());
+            let host_root = canonicalize_host(&host);
             let content = match fs::read_to_string(&file) {
                 Ok(c) => c,
                 Err(e) => {
@@ -290,7 +306,7 @@ fn main() {
                 .fields
                 .get("wf")
                 .and_then(|v| match v {
-                    pidgin_core::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
+                    pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
                     _ => None,
                 })
                 .map(|w| w.required_inputs.clone())
@@ -309,13 +325,14 @@ fn main() {
             println!("{}: {}", file.display(), results.len());
             for r in &results {
                 let status = match r.status {
-                    pidgin_core::resolver::ResolutionStatus::Resolved => "RESOLVED",
-                    pidgin_core::resolver::ResolutionStatus::Missing => "MISSING",
-                    pidgin_core::resolver::ResolutionStatus::Unresolved => "UNRESOLVED",
+                    pidgin_lang::resolver::ResolutionStatus::Resolved => "RESOLVED",
+                    pidgin_lang::resolver::ResolutionStatus::Missing => "MISSING",
+                    pidgin_lang::resolver::ResolutionStatus::Unresolved => "UNRESOLVED",
+                    pidgin_lang::resolver::ResolutionStatus::Forbidden => "FORBIDDEN",
                 };
                 let path = r.resolved_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "-".to_string());
                 println!("  {}  ns={}  id={}  confidence={:.1}  required={}  path={}", status, r.namespace, r.ref_id, r.confidence, r.required, path);
-                if matches!(r.status, pidgin_core::resolver::ResolutionStatus::Unresolved) && r.required {
+                if r.required && matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden) {
                     all_ok = false;
                 }
             }
@@ -384,7 +401,7 @@ fn main() {
 
         Commands::ContextPlan { file, host } => {
             let cfg = load_pipeline_configs(&host);
-            let host_root = host.canonicalize().unwrap_or_else(|_| host.clone());
+            let host_root = canonicalize_host(&host);
             let content = fs::read_to_string(&file).unwrap_or_else(|e| {
                 eprintln!("{}: Error reading file: {}", file.display(), e);
                 std::process::exit(1);
@@ -397,7 +414,7 @@ fn main() {
                 .fields
                 .get("wf")
                 .and_then(|v| match v {
-                    pidgin_core::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
+                    pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
                     _ => None,
                 })
                 .map(|w| w.required_inputs.clone())
@@ -453,7 +470,7 @@ fn main() {
 
         Commands::Run { file, host, out } => {
             let cfg = load_pipeline_configs(&host);
-            let host_root = host.canonicalize().unwrap_or_else(|_| host.clone());
+            let host_root = canonicalize_host(&host);
             let run_id;
 
             // Parse
@@ -496,16 +513,29 @@ fn main() {
             // Resolve
             let required_inputs = packet
                 .fields.get("wf")
-                .and_then(|v| match v { pidgin_core::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s), _ => None })
+                .and_then(|v| match v { pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s), _ => None })
                 .map(|w| w.required_inputs.clone())
                 .unwrap_or_default();
             let ctx = ResolverContext { host_root, aliases: cfg.aliases, required_inputs };
             let resolved = resolve_all(&packet, &ctx);
-            let unresolved = resolved.iter().filter(|r| matches!(r.status, pidgin_core::resolver::ResolutionStatus::Unresolved)).count();
+
+            // Post-resolution private path check
+            let resolved_fired = check_resolved_refs_safety(&resolved, &cfg.safety_rules.private_paths);
+            if !resolved_fired.is_empty() {
+                for rule in &resolved_fired {
+                    eprintln!("{}: Blocked by safety after resolution: {}", file.display(), rule);
+                }
+                std::process::exit(2);
+            }
+
+            let unresolved = resolved.iter().filter(|r| matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden)).count();
             let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Resolve { run_id: run_id.clone(), refs_total: resolved.len(), refs_unresolved: unresolved });
             for r in &resolved {
-                if matches!(r.status, pidgin_core::resolver::ResolutionStatus::Unresolved) && r.required {
-                    eprintln!("{}: Required reference unresolved: {}", file.display(), r.original);
+                if r.required && matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden) {
+                    eprintln!("{}: Required reference {}: {}", file.display(), match r.status {
+                        pidgin_lang::resolver::ResolutionStatus::Forbidden => "forbidden (path traversal blocked)",
+                        _ => "unresolved",
+                    }, r.original);
                     std::process::exit(3);
                 }
             }

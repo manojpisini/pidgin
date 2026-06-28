@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod syntax_validator_tests {
     use crate::parser::parse_packet;
     use crate::validator::syntax::validate_syntax;

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod registry_tests {
     use std::path::Path;
     use crate::registry::{load_action_registry, load_workflow_registry, load_safety_rules};

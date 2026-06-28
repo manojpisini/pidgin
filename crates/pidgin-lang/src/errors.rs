@@ -17,6 +17,18 @@ pub enum ParseError {
 
     #[error("empty run_id")]
     EmptyRunId,
+
+    #[error("packet exceeds maximum size ({0} bytes)")]
+    PacketTooLarge(usize),
+
+    #[error("too many fields (max {0})")]
+    TooManyFields(usize),
+
+    #[error("field too long at byte {0}")]
+    FieldTooLong(usize),
+
+    #[error("invalid field syntax at line {0}: expected name=value")]
+    InvalidField(usize),
 }
 
 #[derive(Debug, thiserror::Error)]

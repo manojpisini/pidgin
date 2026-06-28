@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod schema_validator_tests {
     use std::path::Path;
     use crate::parser::parse_packet;

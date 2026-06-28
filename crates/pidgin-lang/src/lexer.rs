@@ -5,14 +5,16 @@ use winnow::token::{take_till, take_while};
 
 use crate::ast::{Directive, FieldValue};
 
+const MAX_FIELD_LENGTH: usize = 10_000;
+
 pub fn ident(input: &mut &str) -> ModalResult<String> {
-    take_while(1.., |c: char| c.is_ascii_alphanumeric() || c == '_')
+    take_while(1..=MAX_FIELD_LENGTH, |c: char| c.is_ascii_alphanumeric() || c == '_')
         .map(|s: &str| s.to_string())
         .parse_next(input)
 }
 
 pub fn bare_word(input: &mut &str) -> ModalResult<String> {
-    take_while(1.., |c: char| {
+    take_while(1..=MAX_FIELD_LENGTH, |c: char| {
         c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ':' || c == '.'
     })
     .map(|s: &str| s.to_string())
@@ -20,7 +22,7 @@ pub fn bare_word(input: &mut &str) -> ModalResult<String> {
 }
 
 pub fn quoted_string(input: &mut &str) -> ModalResult<String> {
-    ('"', take_till(0.., |c: char| c == '"'), '"')
+    ('"', take_till(0..=MAX_FIELD_LENGTH, |c: char| c == '"'), '"')
         .map(|(_lq, s, _rq): (_, &str, _)| s.to_string())
         .parse_next(input)
 }
@@ -66,7 +68,7 @@ pub fn field_value(input: &mut &str) -> ModalResult<FieldValue> {
 pub fn header_line(input: &mut &str) -> ModalResult<(Directive, String)> {
     '@'.parse_next(input)?;
 
-    let directive_str: String = take_while(1.., |c: char| c.is_ascii_alphabetic())
+    let directive_str: String = take_while(1..=MAX_FIELD_LENGTH, |c: char| c.is_ascii_alphabetic())
         .map(|s: &str| s.to_string())
         .parse_next(input)?;
 
@@ -80,7 +82,7 @@ pub fn header_line(input: &mut &str) -> ModalResult<(Directive, String)> {
 
     multispace0.parse_next(input)?;
 
-    let run_id: String = take_while(1.., |c: char| {
+    let run_id: String = take_while(1..=MAX_FIELD_LENGTH, |c: char| {
         c.is_ascii_alphanumeric() || c == '_' || c == '.'
     })
     .map(|s: &str| s.to_string())

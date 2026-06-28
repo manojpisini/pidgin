@@ -3,6 +3,8 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+const MAX_CONFIG_SIZE: u64 = 10_485_760; // 10 MiB
+
 #[derive(Debug, Deserialize)]
 pub struct ActionRegistry {
     pub safe: Vec<String>,
@@ -59,20 +61,36 @@ pub enum ConfigError {
     Yaml(#[from] serde_yaml::Error),
 }
 
+fn read_yaml_to_string(path: &Path) -> Result<String, ConfigError> {
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > MAX_CONFIG_SIZE {
+        return Err(ConfigError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "config file {} exceeds maximum size ({} > {})",
+                path.display(),
+                metadata.len(),
+                MAX_CONFIG_SIZE
+            ),
+        )));
+    }
+    Ok(std::fs::read_to_string(path)?)
+}
+
 pub fn load_action_registry(path: &Path) -> Result<ActionRegistry, ConfigError> {
-    let content = std::fs::read_to_string(path)?;
+    let content = read_yaml_to_string(path)?;
     let registry: ActionRegistry = serde_yaml::from_str(&content)?;
     Ok(registry)
 }
 
 pub fn load_workflow_registry(path: &Path) -> Result<WorkflowRegistry, ConfigError> {
-    let content = std::fs::read_to_string(path)?;
+    let content = read_yaml_to_string(path)?;
     let registry: WorkflowRegistry = serde_yaml::from_str(&content)?;
     Ok(registry)
 }
 
 pub fn load_safety_rules(path: &Path) -> Result<SafetyRules, ConfigError> {
-    let content = std::fs::read_to_string(path)?;
+    let content = read_yaml_to_string(path)?;
     let rules: SafetyRules = serde_yaml::from_str(&content)?;
     Ok(rules)
 }

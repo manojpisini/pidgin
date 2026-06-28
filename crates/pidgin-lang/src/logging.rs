@@ -2,6 +2,15 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 
+const MAX_LOG_LINE: usize = 4096;
+
+fn sanitize(s: &str) -> String {
+    s.chars()
+        .filter(|&c| c.is_ascii_graphic() || c == ' ' || c == '\t')
+        .take(256)
+        .collect()
+}
+
 #[derive(Debug)]
 pub enum LogEvent {
     Parse { run_id: String, ok: bool },
@@ -44,33 +53,38 @@ fn chrono_now() -> String {
 }
 
 fn format_line(timestamp: String, event: &LogEvent) -> String {
-    match event {
+    let line = match event {
         LogEvent::Parse { run_id, ok } => {
-            format!("[{}] PARSE {} {}", timestamp, if *ok { "OK" } else { "FAIL" }, run_id)
+            format!("[{}] PARSE {} {}", timestamp, if *ok { "OK" } else { "FAIL" }, sanitize(run_id))
         }
         LogEvent::Validate { run_id, ok } => {
-            format!("[{}] VALIDATE {} {}", timestamp, if *ok { "OK" } else { "FAIL" }, run_id)
+            format!("[{}] VALIDATE {} {}", timestamp, if *ok { "OK" } else { "FAIL" }, sanitize(run_id))
         }
         LogEvent::SafetyGate { run_id, blocked, rules } => {
             format!(
                 "[{}] SAFETY {} {} rules=[{}]",
                 timestamp,
                 if *blocked { "BLOCKED" } else { "PASS" },
-                run_id,
-                rules
+                sanitize(run_id),
+                sanitize(rules),
             )
         }
         LogEvent::Resolve { run_id, refs_total, refs_unresolved } => {
             format!(
                 "[{}] RESOLVE {} refs={} unresolved={}",
-                timestamp, run_id, refs_total, refs_unresolved
+                timestamp, sanitize(run_id), refs_total, refs_unresolved
             )
         }
         LogEvent::Expand { run_id, packet_type } => {
-            format!("[{}] EXPAND {} type={}", timestamp, run_id, packet_type)
+            format!("[{}] EXPAND {} type={}", timestamp, sanitize(run_id), sanitize(packet_type))
         }
         LogEvent::Run { run_id, status } => {
-            format!("[{}] RUN {} status={}", timestamp, run_id, status)
+            format!("[{}] RUN {} status={}", timestamp, sanitize(run_id), sanitize(status))
         }
+    };
+    if line.len() > MAX_LOG_LINE {
+        line[..MAX_LOG_LINE].to_string()
+    } else {
+        line
     }
 }

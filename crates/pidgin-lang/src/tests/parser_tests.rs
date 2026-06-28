@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod parser_tests {
     use crate::parser::parse_packet;
     use crate::ast::{Directive, FieldValue};

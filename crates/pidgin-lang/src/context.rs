@@ -36,7 +36,7 @@ pub fn build_context_plan(packet: &PgnPacket, resolved: &[ResolvedRef]) -> Conte
         .iter()
         .map(|r| r.original.len())
         .sum();
-    let token_budget = (total_chars + 3) / 4;
+    let token_budget = total_chars.div_ceil(4);
 
     ContextPlan {
         run_id: packet.run_id.clone(),

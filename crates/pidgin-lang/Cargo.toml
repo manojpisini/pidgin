@@ -1,0 +1,17 @@
+[package]
+name = "pidgin-lang"
+version = "0.1.0"
+edition = "2024"
+description = "A compact agent handoff protocol runtime — parse, validate, resolve, and expand Pidgin packets"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/anomalyco/pidgin-lang"
+keywords = ["pidgin", "agent", "handoff", "protocol", "llm"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.34"
+thiserror = "2.0.18"
+winnow = "1.0.3"
+
+[dev-dependencies]
+proptest = "1"

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod lexer_tests {
     use crate::lexer::{header_line, field_line, list_value, scalar_value};
     use crate::ast::{Directive, FieldValue};

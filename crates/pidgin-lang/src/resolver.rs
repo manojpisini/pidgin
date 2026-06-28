@@ -10,6 +10,7 @@ pub enum ResolutionStatus {
     Resolved,
     Missing,
     Unresolved,
+    Forbidden,
 }
 
 #[derive(Debug, Clone)]
@@ -146,13 +147,112 @@ pub fn resolve_all(packet: &PgnPacket, ctx: &ResolverContext) -> Vec<ResolvedRef
     results
 }
 
+fn resolve_symlink_target(path: &Path, depth: usize) -> Option<PathBuf> {
+    if depth == 0 || !path.is_symlink() {
+        return None;
+    }
+    let target = std::fs::read_link(path).ok()?;
+    let absolute = if target.is_absolute() {
+        target
+    } else if let Some(parent) = path.parent() {
+        parent.join(&target)
+    } else {
+        target
+    };
+    if absolute.is_symlink() {
+        resolve_symlink_target(&absolute, depth - 1)
+    } else {
+        Some(absolute)
+    }
+}
+
+fn is_path_within_root(candidate: &Path, root: &Path) -> bool {
+    let canonical_root = match root.canonicalize() {
+        Ok(r) => r,
+        Err(_) => return false,
+    };
+
+    // Resolve symlinks explicitly if present
+    if let Some(sym_target) = resolve_symlink_target(candidate, 8)
+        && !sym_target.starts_with(&canonical_root)
+    {
+        return false;
+    }
+
+    // If the path exists, use canonicalize for proper symlink resolution
+    if let Ok(canonical) = candidate.canonicalize() {
+        return canonical.starts_with(&canonical_root);
+    }
+
+    // For non-existent paths: verify component-by-component that the path
+    // doesn't use ParentDir to escape above canonical_root
+    let root_comps: Vec<_> = canonical_root.components().collect();
+    let candidate_comps: Vec<_> = candidate.components().collect();
+
+    if candidate_comps.len() < root_comps.len() {
+        return false;
+    }
+
+    // First root_len components must match root exactly
+    for (i, rc) in root_comps.iter().enumerate() {
+        if candidate_comps.get(i) != Some(rc) {
+            return false;
+        }
+    }
+
+    // Remaining components must not escape above root via ParentDir
+    let mut relative_depth: isize = 0;
+    for comp in &candidate_comps[root_comps.len()..] {
+        match comp {
+            std::path::Component::ParentDir => {
+                relative_depth -= 1;
+                if relative_depth < 0 {
+                    return false;
+                }
+            }
+            std::path::Component::Normal(_) | std::path::Component::CurDir => {
+                relative_depth += 1;
+            }
+            _ => return false,
+        }
+    }
+
+    true
+}
+
 fn resolve_file_ref(
     original: &str,
     ref_id: &str,
     host_root: &Path,
     required: bool,
 ) -> ResolvedRef {
-    let resolved_path = host_root.join(ref_id);
+    let canonical_root = match host_root.canonicalize() {
+        Ok(r) => r,
+        Err(_) => {
+            return ResolvedRef {
+                original: original.to_string(),
+                namespace: "file".to_string(),
+                ref_id: ref_id.to_string(),
+                resolved_path: None,
+                confidence: 0.0,
+                required,
+                status: ResolutionStatus::Forbidden,
+            };
+        }
+    };
+    let resolved_path = canonical_root.join(ref_id);
+
+    if !is_path_within_root(&resolved_path, &canonical_root) {
+        return ResolvedRef {
+            original: original.to_string(),
+            namespace: "file".to_string(),
+            ref_id: ref_id.to_string(),
+            resolved_path: None,
+            confidence: 0.0,
+            required,
+            status: ResolutionStatus::Forbidden,
+        };
+    }
 
     let (status, confidence) = if resolved_path.exists() {
         (ResolutionStatus::Resolved, 1.0)
@@ -177,7 +277,33 @@ fn resolve_folder_ref(
     host_root: &Path,
     required: bool,
 ) -> ResolvedRef {
-    let resolved_path = host_root.join(ref_id);
+    let canonical_root = match host_root.canonicalize() {
+        Ok(r) => r,
+        Err(_) => {
+            return ResolvedRef {
+                original: original.to_string(),
+                namespace: "folder".to_string(),
+                ref_id: ref_id.to_string(),
+                resolved_path: None,
+                confidence: 0.0,
+                required,
+                status: ResolutionStatus::Forbidden,
+            };
+        }
+    };
+    let resolved_path = canonical_root.join(ref_id);
+
+    if !is_path_within_root(&resolved_path, &canonical_root) {
+        return ResolvedRef {
+            original: original.to_string(),
+            namespace: "folder".to_string(),
+            ref_id: ref_id.to_string(),
+            resolved_path: None,
+            confidence: 0.0,
+            required,
+            status: ResolutionStatus::Forbidden,
+        };
+    }
 
     let (status, confidence) = if resolved_path.is_dir() {
         (ResolutionStatus::Resolved, 1.0)
@@ -197,6 +323,17 @@ fn resolve_folder_ref(
 }
 
 pub fn load_aliases(path: &Path) -> Result<ReferenceAliases, crate::registry::ConfigError> {
+    let metadata = std::fs::metadata(path)?;
+    if metadata.len() > 10_485_760 {
+        return Err(crate::registry::ConfigError::Io(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!(
+                "config file {} exceeds maximum size ({} > 10 MiB)",
+                path.display(),
+                metadata.len()
+            ),
+        )));
+    }
     let content = std::fs::read_to_string(path)?;
     let aliases: ReferenceAliases = serde_yaml::from_str(&content)?;
     Ok(aliases)

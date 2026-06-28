@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod expander_tests {
     use std::collections::BTreeMap;
     use std::path::Path;

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod safety_tests {
     use std::path::Path;
     use crate::parser::parse_packet;

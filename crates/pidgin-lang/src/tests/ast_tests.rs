@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod ast_tests {
     use crate::ast::{Directive, FieldValue, PgnPacket};
     use std::collections::BTreeMap;

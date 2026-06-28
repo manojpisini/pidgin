@@ -11,7 +11,7 @@ pub struct TokenReport {
 }
 
 pub fn estimate_tokens(text: &str) -> usize {
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 pub fn measure_packet(packet: &PgnPacket) -> TokenReport {
@@ -36,7 +36,7 @@ pub fn measure_packet(packet: &PgnPacket) -> TokenReport {
 
     TokenReport {
         char_count,
-        estimated_tokens: (char_count + 3) / 4,
+        estimated_tokens: char_count.div_ceil(4),
         line_count,
         field_count,
     }

@@ -1,4 +1,5 @@
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod resolver_tests {
     use std::path::Path;
 
@@ -176,5 +177,89 @@ mod resolver_tests {
         let aliases = load_aliases(&path).unwrap();
         assert!(aliases.aliases.is_empty());
         assert!(aliases.common.is_empty());
+    }
+
+    #[test]
+    fn file_ref_traversal_returns_forbidden() {
+        let ctx = make_ctx(empty_aliases());
+        let result = resolve_ref("file:../../etc/passwd", &ctx);
+        assert_eq!(
+            result.status,
+            ResolutionStatus::Forbidden,
+            "expected Forbidden for traversal: {:?}",
+            result.resolved_path
+        );
+        assert!(result.resolved_path.is_none());
+    }
+
+    #[test]
+    fn folder_ref_traversal_returns_forbidden() {
+        let ctx = make_ctx(empty_aliases());
+        let result = resolve_ref("folder:../../../", &ctx);
+        assert_eq!(result.status, ResolutionStatus::Forbidden);
+        assert!(result.resolved_path.is_none());
+    }
+
+    #[test]
+    fn file_ref_normal_path_still_works() {
+        let ctx = make_ctx(empty_aliases());
+        let result = resolve_ref("file:Cargo.toml", &ctx);
+        assert_eq!(result.status, ResolutionStatus::Resolved);
+        assert!((result.confidence - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn file_ref_dotdot_within_root_still_works() {
+        let ctx = make_ctx(empty_aliases());
+        // configs/../Cargo.toml stays within workspace root because
+        // ParentDir cancels with configs/, leaving Cargo.toml at root
+        let result = resolve_ref("file:configs/../Cargo.toml", &ctx);
+        assert_eq!(result.status, ResolutionStatus::Resolved);
+    }
+
+    #[test]
+    fn file_ref_absolute_path_outside_forbidden() {
+        let ctx = make_ctx(empty_aliases());
+        let result = resolve_ref("file:/tmp", &ctx);
+        assert_eq!(
+            result.status,
+            ResolutionStatus::Forbidden,
+            "absolute path outside root should be forbidden"
+        );
+    }
+
+    #[test]
+    fn file_ref_traversal_escape_then_return_forbidden() {
+        // configs/../../target goes up to parent of root, then back to target/
+        // under root — but the intermediate escape is still flagged as forbidden
+        // (strict but safe)
+        let ctx = make_ctx(empty_aliases());
+        let result = resolve_ref("file:configs/../../target", &ctx);
+        assert_eq!(result.status, ResolutionStatus::Forbidden);
+    }
+
+    #[test]
+    fn file_ref_encoded_dotdot_returns_forbidden() {
+        let ctx = make_ctx(empty_aliases());
+        // Some traversal attempts use patterns like "safe/..%2f..%2fetc"
+        // but at the raw ref_id level, we check path joining with host_root
+        // and canonicalize the result
+        let result = resolve_ref("file:safe/../../../etc/hosts", &ctx);
+        assert_eq!(result.status, ResolutionStatus::Forbidden);
+    }
+
+    #[test]
+    fn file_ref_stays_in_host_root_breadth_first() {
+        // Navigate to a sibling that is within root: configs/SAFETY_RULES.yaml
+        let ctx = make_ctx(empty_aliases());
+        let result = resolve_ref("file:configs/SAFETY_RULES.yaml", &ctx);
+        // configs/ is directly under workspace root, so this is within root
+        let expected = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../configs/SAFETY_RULES.yaml");
+        if expected.exists() {
+            assert_eq!(result.status, ResolutionStatus::Resolved);
+        } else {
+            assert_eq!(result.status, ResolutionStatus::Missing);
+        }
     }
 }

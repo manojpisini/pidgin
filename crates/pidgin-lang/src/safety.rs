@@ -1,5 +1,6 @@
 use crate::ast::{FieldValue, PgnPacket};
 use crate::registry::{ActionRegistry, SafetyRules, WorkflowRegistry};
+use crate::resolver::ResolvedRef;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SafetyRuleId {
@@ -85,10 +86,10 @@ pub fn check_safety(
     // SG-3: high/crit risk defaults to human=yes, explicit human=no on high/crit blocks
     if effective_risk == "high" || effective_risk == "crit" {
         human_required = true;
-        if let Some(FieldValue::Scalar(human)) = packet.fields.get("human") {
-            if human == "no" {
-                fired_rules.push(SafetyRuleId::Sg3);
-            }
+        if let Some(FieldValue::Scalar(human)) = packet.fields.get("human")
+            && human == "no"
+        {
+            fired_rules.push(SafetyRuleId::Sg3);
         }
     }
 
@@ -105,21 +106,19 @@ pub fn check_safety(
     }
 
     // SG-5: unknown workflow
-    if let Some(FieldValue::Scalar(wf_name)) = packet.fields.get("wf") {
-        if !workflows.workflows.contains_key(wf_name) {
-            fired_rules.push(SafetyRuleId::Sg5);
-        }
+    if let Some(FieldValue::Scalar(wf_name)) = packet.fields.get("wf")
+        && !workflows.workflows.contains_key(wf_name)
+    {
+        fired_rules.push(SafetyRuleId::Sg5);
     }
 
     // SG-6: invalid mode
     if let (Some(FieldValue::Scalar(wf_name)), Some(FieldValue::Scalar(mode))) =
         (packet.fields.get("wf"), packet.fields.get("mode"))
+        && let Some(workflow) = workflows.workflows.get(wf_name)
+        && !workflow.allowed_modes.contains(mode)
     {
-        if let Some(workflow) = workflows.workflows.get(wf_name) {
-            if !workflow.allowed_modes.contains(mode) {
-                fired_rules.push(SafetyRuleId::Sg6);
-            }
-        }
+        fired_rules.push(SafetyRuleId::Sg6);
     }
 
     // SG-7: note field is never parsed for instructions (tested implicitly - no action taken)
@@ -170,11 +169,9 @@ fn compute_effective_risk(packet: &PgnPacket, workflows: &WorkflowRegistry) -> S
 
 fn reference_matches_pattern(reference: &str, pattern: &str) -> bool {
     // Simple glob-like matching for private path patterns
-    if pattern.starts_with("**/") {
-        let suffix = &pattern[3..];
+    if let Some(suffix) = pattern.strip_prefix("**/") {
         reference.contains(suffix)
-    } else if pattern.ends_with(".*") {
-        let prefix = &pattern[..pattern.len() - 2];
+    } else if let Some(prefix) = pattern.strip_suffix(".*") {
         reference.starts_with(prefix)
     } else if pattern.starts_with('.') {
         // Dot-prefixed patterns like .env, .env.*
@@ -182,4 +179,25 @@ fn reference_matches_pattern(reference: &str, pattern: &str) -> bool {
     } else {
         reference == pattern
     }
+}
+
+/// Post-resolution safety check: compares canonical resolved paths against
+/// private path patterns. This catches cases where aliases or path traversal
+/// disguise a reference to a private path.
+pub fn check_resolved_refs_safety(
+    resolved: &[ResolvedRef],
+    private_paths: &[String],
+) -> Vec<SafetyRuleId> {
+    let mut fired = Vec::new();
+    for r in resolved {
+        let path_str = r.resolved_path.as_ref().map(|p| p.display().to_string());
+        let check_str = path_str.as_deref().unwrap_or(&r.ref_id);
+        for pattern in private_paths {
+            if check_str.contains(pattern) || reference_matches_pattern(check_str, pattern) {
+                fired.push(SafetyRuleId::Sg4);
+                break;
+            }
+        }
+    }
+    fired
 }
