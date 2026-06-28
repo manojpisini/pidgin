@@ -1,11 +1,15 @@
 [package]
 name = "pidgin-lang"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 description = "A compact agent handoff protocol runtime — parse, validate, resolve, and expand Pidgin packets"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/anomalyco/pidgin-lang"
+repository = "https://github.com/manojpisini/pidgin"
+homepage = "https://github.com/manojpisini/pidgin"
+documentation = "https://docs.rs/pidgin-lang"
+readme = "README.md"
 keywords = ["pidgin", "agent", "handoff", "protocol", "llm"]
+categories = ["parser-implementations", "web-programming", "config"]
 
 [dependencies]
 clap = { version = "4.6.1", default-features = false, features = ["std", "derive"] }
