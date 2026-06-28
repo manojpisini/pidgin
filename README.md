@@ -1,7 +1,7 @@
 # Pidgin — A Compact Agent Handoff Protocol & Runtime
 
 [![Crates.io](https://img.shields.io/crates/v/pidgin-lang.svg)](https://crates.io/crates/pidgin-lang)
-[![CI](https://github.com/anomalyco/pidgin-lang/actions/workflows/ci.yml/badge.svg)](https://github.com/anomalyco/pidgin-lang/actions/workflows/ci.yml)
+[![CI](https://github.com/manojpisini/pidgin/actions/workflows/ci.yml/badge.svg)](https://github.com/manojpisini/pidgin/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
 **Pidgin** is a small, fast, local-first protocol and runtime for compact, structured handoffs between AI agents, between an agent and a human operator, and between an orchestrator and the tools/executors it drives.
