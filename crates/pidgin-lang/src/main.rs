@@ -150,7 +150,171 @@ enum Commands {
         #[arg(long, default_value = ".")]
         host: PathBuf,
     },
+
+    /// Scaffold a default .pidgin/ config directory
+    Init {
+        #[arg(long, default_value = ".")]
+        host: PathBuf,
+        #[arg(long)]
+        force: bool,
+    },
 }
+
+const DEFAULT_RUNTIME_CONFIG: &str = r#"runtime:
+  name: pidgin
+  spec_version: "1.0"
+  strict_mode: true
+  default_dry_run: true
+
+host:
+  root: "."
+  inbox: ".pidgin/inbox"
+  outbox: ".pidgin/generated"
+  logs: ".pidgin/logs"
+  config_dir: ".pidgin"
+
+paths:
+  aliases: .pidgin/REFERENCE_ALIASES.yaml
+  workflow_registry: .pidgin/WORKFLOW_REGISTRY.yaml
+  action_registry: .pidgin/ACTION_REGISTRY.yaml
+  output_registry: .pidgin/OUTPUT_REGISTRY.yaml
+  safety_rules: .pidgin/SAFETY_RULES.yaml
+  token_budgets: .pidgin/TOKEN_BUDGETS.yaml
+
+logs:
+  agent_messages: .pidgin/logs/AGENT_MESSAGES.csv
+  protocol_errors: .pidgin/logs/PROTOCOL_ERRORS.csv
+  runtime_runs: .pidgin/logs/PIDGIN_RUNTIME_RUNS.csv
+  token_usage: .pidgin/logs/TOKEN_USAGE_LOG.csv
+
+defaults:
+  deny:
+    - publish
+    - send
+    - delete
+    - secrets
+    - credentials
+    - external_action
+  human_for_dangerous_actions: true
+  block_private_paths: true
+  estimate_tokens_by_chars: true
+"#;
+
+const DEFAULT_WORKFLOW_REGISTRY: &str = r#"workflows:
+  generic_review:
+    description: Review a piece of content or code against a set of source references.
+    risk_default: med
+    allowed_modes: [draft, review, approval]
+    required_inputs: [primary_subject, source_refs]
+    expected_outputs: [review_notes, risk_flags, approval]
+    recommended_executor: claude-code
+    fallback_executor: opencode
+
+  generic_health_check:
+    description: Check a host's structure, configuration, and logs for drift or errors.
+    risk_default: low
+    allowed_modes: [review, patch]
+    required_inputs: [host_tree, configs, logs]
+    expected_outputs: [health_report, review_required]
+    recommended_executor: opencode
+    fallback_executor: claude-code
+
+  generic_draft_and_distribute:
+    description: Draft a piece of output content from a source and prepare it for
+      multiple destination formats, gated on human approval before anything is sent.
+    risk_default: med
+    allowed_modes: [draft, review, approval]
+    required_inputs: [source, style_guide]
+    expected_outputs: [drafts, approval]
+    recommended_executor: claude-code
+    fallback_executor: codex
+"#;
+
+const DEFAULT_ACTION_REGISTRY: &str = r#"safe:
+  - read
+  - retrieve
+  - summarize
+  - classify
+  - draft
+  - review
+  - score
+  - rank
+  - flag
+  - compare
+  - extract
+  - package
+  - validate
+  - log
+  - index
+
+controlled:
+  - patch
+  - move
+  - rename
+  - update
+  - append
+  - reindex
+  - optimize
+  - compress
+  - expand
+  - rerank
+
+human_gated:
+  - publish
+  - send
+  - delete
+  - moderate
+  - archive
+  - credential
+  - approve
+  - reject
+  - promote_memory
+  - change_policy
+  - external_action
+"#;
+
+const DEFAULT_SAFETY_RULES: &str = r#"default_deny:
+  - publish
+  - send
+  - delete
+  - secrets
+  - credentials
+  - external_action
+
+private_paths:
+  - ".env"
+  - ".env.*"
+  - "*.key"
+  - "*.pem"
+  - ".git/"
+  - "**/secrets/**"
+  - "**/.ssh/**"
+
+human_required:
+  actions:
+    - publish
+    - send
+    - delete
+    - moderate
+    - credential
+    - promote_memory
+    - external_action
+  risk_levels:
+    - high
+    - crit
+
+block_if:
+  action_in_do_and_deny: true
+  private_path_referenced: true
+  unknown_workflow: true
+  invalid_mode: true
+  missing_required_field: true
+  dangerous_action_without_human: true
+"#;
+
+const DEFAULT_REFERENCE_ALIASES: &str = r#"aliases: {}
+common: {}
+"#;
 
 fn main() {
     let cli = Cli::parse();
@@ -613,6 +777,50 @@ fn main() {
                 println!("All checks passed");
             } else {
                 std::process::exit(4);
+            }
+        }
+
+        Commands::Init { host, force } => {
+            let config_dir = host.join(".pidgin");
+            let logs_dir = config_dir.join("logs");
+
+            if config_dir.exists() && !force {
+                eprintln!("{} already exists (use --force to overwrite)", config_dir.display());
+                std::process::exit(1);
+            }
+
+            fs::create_dir_all(&logs_dir).unwrap_or_else(|e| {
+                eprintln!("error: cannot create {}: {}", logs_dir.display(), e);
+                std::process::exit(1);
+            });
+
+            let files: Vec<(&str, &Path, &str)> = vec![
+                ("PIDGIN_RUNTIME_CONFIG.yaml", &config_dir, DEFAULT_RUNTIME_CONFIG),
+                ("WORKFLOW_REGISTRY.yaml", &config_dir, DEFAULT_WORKFLOW_REGISTRY),
+                ("ACTION_REGISTRY.yaml", &config_dir, DEFAULT_ACTION_REGISTRY),
+                ("SAFETY_RULES.yaml", &config_dir, DEFAULT_SAFETY_RULES),
+                ("REFERENCE_ALIASES.yaml", &config_dir, DEFAULT_REFERENCE_ALIASES),
+            ];
+
+            let mut count = 0;
+            for (name, dir, content) in &files {
+                let path = dir.join(name);
+                if path.exists() && !force {
+                    println!("  SKIP {}", name);
+                    continue;
+                }
+                fs::write(&path, content).unwrap_or_else(|e| {
+                    eprintln!("error: cannot write {}: {}", path.display(), e);
+                    std::process::exit(1);
+                });
+                println!("  CREATE {}", name);
+                count += 1;
+            }
+
+            if count > 0 {
+                println!("initialized pidgin host config in {}", config_dir.display());
+            } else {
+                println!("nothing to do (use --force to overwrite existing files)");
             }
         }
     }

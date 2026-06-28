@@ -28,9 +28,8 @@ Pidgin is **not** a model, not an agent framework, not a replacement for MCP/A2A
 # Install
 cargo install pidgin-lang
 
-# Create project config
-mkdir -p .pidgin
-# Copy registries from your project or start from defaults
+# Scaffold a host configuration (creates .pidgin/ with defaults)
+pgn init
 
 # Parse a packet
 pgn parse examples/basic/generic_task.pgn
@@ -93,6 +92,7 @@ human=yes
 
 | Command | Description |
 |---------|-------------|
+| `pgn init [--host .] [--force]` | Scaffold default `.pidgin/` configuration |
 | `pgn parse <file>` | Parse a packet and print the AST |
 | `pgn validate <files> --host .` | Validate syntax + schema against registries |
 | `pgn check <file> --host .` | Parse → validate → safety → resolve (end-to-end check) |
@@ -137,6 +137,44 @@ The safety gate enforces 9 numbered rules (SG-1 through SG-9):
 - **SG-9**: Critical risk requires an `@approval` packet
 
 **Safety-first principle:** If the runtime is ever uncertain, it fails closed (blocks, asks for human approval, or refuses to expand) rather than fail open.
+
+---
+
+## Multi-Agent Integration
+
+Pidgin is the handoff *format* between agents, not an orchestrator itself:
+
+```text
+Agent A (orchestrator) ──produces .pgn──→ Pidgin (validate→safety→resolve→expand)
+                                                                                │
+                                                                           result .pgn
+                                                                                │
+                                                                           Pidgin (validate→log)
+                                                                                │
+Agent A ◀──────────────────────── reads result ────────────────────────────────┘
+```
+
+### Integration Patterns
+
+| Framework | How Pidgin fits |
+|-----------|----------------|
+| **LangGraph** | Pidgin node parses/validates packets before routing. Expanded packets become structured messages in graph state. |
+| **CrewAI** | Agent task outputs are `.pgn` packets; Pidgin validates inter-agent handoffs. |
+| **A2A** | Expanded Run Packets drop inside A2A Tasks when crossing trust boundaries. |
+| **MCP** | Pidgin runs as an MCP server exposing `parse`, `validate`, `expand` as tools. |
+| **Python SDK** | `python/` SDK wraps `pgn` as subprocess or PyO3 calls with typed Pydantic models. |
+
+### Hooking into the Pipeline
+
+Each pipeline stage is a public function you can compose in your own code:
+
+```rust
+use pidgin_lang::parser::parse_packet;
+use pidgin_lang::safety::check_safety;
+use pidgin_lang::expander::expand_to_run_packet;
+
+let packet = parse_packet("@run my.task\nwf=generic_review\nmode=draft")?;
+```
 
 ---
 
@@ -258,4 +296,4 @@ Licensed under either of [MIT](LICENSE-MIT) or [Apache 2.0](LICENSE-Apache-2.0) 
 - [crates.io: pidgin-lang](https://crates.io/crates/pidgin-lang)
 - [Specification](docs/SPEC.md)
 - [Security Review](docs/SECURITY_REVIEW.md)
-- [GitHub](https://github.com/anomalyco/pidgin-lang)
+- [GitHub](https://github.com/manojpisini/pidgin)
