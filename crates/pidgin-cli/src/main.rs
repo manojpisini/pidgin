@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use pidgin_core::parser::parse_packet;
 use pidgin_core::registry::{load_action_registry, load_safety_rules, load_workflow_registry};
+use pidgin_core::resolver::{load_aliases, resolve_all, ResolverContext};
 use pidgin_core::safety::check_safety;
 use pidgin_core::validator::syntax::validate_syntax;
 use pidgin_core::validator::schema::validate_schema;
@@ -36,6 +37,16 @@ enum Commands {
 
     /// Validate → safety gate, end to end
     Check {
+        /// Path to the .pgn file
+        file: PathBuf,
+
+        /// Host root directory (for config lookup)
+        #[arg(long, default_value = ".")]
+        host: PathBuf,
+    },
+
+    /// Resolve all short references in a packet
+    Resolve {
         /// Path to the .pgn file
         file: PathBuf,
 
@@ -121,6 +132,96 @@ fn main() {
 
             if !all_passed {
                 std::process::exit(1);
+            }
+        }
+
+        Commands::Resolve { file, host } => {
+            let config_dir = host.join(".pidgin");
+            let workflow_path = config_dir.join("WORKFLOW_REGISTRY.yaml");
+            let aliases_path = config_dir.join("REFERENCE_ALIASES.yaml");
+
+            let workflows = match load_workflow_registry(&workflow_path) {
+                Ok(w) => w,
+                Err(e) => {
+                    eprintln!("Error loading workflow registry: {}", e);
+                    std::process::exit(4);
+                }
+            };
+
+            let aliases = match load_aliases(&aliases_path) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("Error loading reference aliases: {}", e);
+                    std::process::exit(4);
+                }
+            };
+
+            let content = match fs::read_to_string(&file) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("{}: Error reading file: {}", file.display(), e);
+                    std::process::exit(1);
+                }
+            };
+
+            let packet = match parse_packet(&content) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("{}: Parse error: {}", file.display(), e);
+                    std::process::exit(1);
+                }
+            };
+
+            // Get required inputs from the workflow, if known
+            let required_inputs = packet
+                .fields
+                .get("wf")
+                .and_then(|v| match v {
+                    pidgin_core::ast::FieldValue::Scalar(s) => workflows.workflows.get(s),
+                    _ => None,
+                })
+                .map(|w| w.required_inputs.clone())
+                .unwrap_or_default();
+
+            let ctx = ResolverContext {
+                host_root: host.canonicalize().unwrap_or_else(|_| host.clone()),
+                aliases,
+                required_inputs,
+            };
+
+            let results = resolve_all(&packet, &ctx);
+
+            if results.is_empty() {
+                println!("{}: no references found", file.display());
+                return;
+            }
+
+            let mut all_resolved_or_missing = true;
+            println!("{}: {}", file.display(), results.len());
+
+            for r in &results {
+                let status = match r.status {
+                    pidgin_core::resolver::ResolutionStatus::Resolved => "RESOLVED",
+                    pidgin_core::resolver::ResolutionStatus::Missing => "MISSING",
+                    pidgin_core::resolver::ResolutionStatus::Unresolved => "UNRESOLVED",
+                };
+                let path = r
+                    .resolved_path
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "-".to_string());
+                println!(
+                    "  {}  ns={}  id={}  confidence={:.1}  required={}  path={}",
+                    status, r.namespace, r.ref_id, r.confidence, r.required, path
+                );
+                if matches!(r.status, pidgin_core::resolver::ResolutionStatus::Unresolved) && r.required
+                {
+                    all_resolved_or_missing = false;
+                }
+            }
+
+            if !all_resolved_or_missing {
+                std::process::exit(3);
             }
         }
 
