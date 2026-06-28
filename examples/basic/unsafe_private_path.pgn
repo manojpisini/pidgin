@@ -1,0 +1,7 @@
+@run unsafe.private_path
+wf=generic_review
+mode=draft
+in=[file:.env]
+out=[review_notes]
+risk=low
+human=yes

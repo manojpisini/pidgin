@@ -7,6 +7,8 @@ use crate::errors::ParseError;
 use crate::lexer::{header_line, field_line};
 
 pub fn parse_packet(input: &str) -> Result<PgnPacket, ParseError> {
+    // Strip UTF-8 BOM if present
+    let input = input.strip_prefix('\u{FEFF}').unwrap_or(input);
     let input = input.trim();
     let mut lines: Vec<&str> = input.lines().collect();
 

@@ -3,7 +3,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 use pidgin_core::parser::parse_packet;
-use pidgin_core::registry::load_workflow_registry;
+use pidgin_core::registry::{load_action_registry, load_safety_rules, load_workflow_registry};
+use pidgin_core::safety::check_safety;
 use pidgin_core::validator::syntax::validate_syntax;
 use pidgin_core::validator::schema::validate_schema;
 
@@ -27,6 +28,16 @@ enum Commands {
         /// Path to the .pgn file(s)
         #[arg(required = true)]
         files: Vec<PathBuf>,
+
+        /// Host root directory (for config lookup)
+        #[arg(long, default_value = ".")]
+        host: PathBuf,
+    },
+
+    /// Validate → safety gate, end to end
+    Check {
+        /// Path to the .pgn file
+        file: PathBuf,
 
         /// Host root directory (for config lookup)
         #[arg(long, default_value = ".")]
@@ -110,6 +121,84 @@ fn main() {
 
             if !all_passed {
                 std::process::exit(1);
+            }
+        }
+
+        Commands::Check { file, host } => {
+            let config_dir = host.join(".pidgin");
+            let workflow_path = config_dir.join("WORKFLOW_REGISTRY.yaml");
+            let action_path = config_dir.join("ACTION_REGISTRY.yaml");
+            let safety_path = config_dir.join("SAFETY_RULES.yaml");
+
+            let workflows = match load_workflow_registry(&workflow_path) {
+                Ok(w) => w,
+                Err(e) => {
+                    eprintln!("Error loading workflow registry: {}", e);
+                    std::process::exit(4);
+                }
+            };
+
+            let actions = match load_action_registry(&action_path) {
+                Ok(a) => a,
+                Err(e) => {
+                    eprintln!("Error loading action registry: {}", e);
+                    std::process::exit(4);
+                }
+            };
+
+            let safety_rules = match load_safety_rules(&safety_path) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("Error loading safety rules: {}", e);
+                    std::process::exit(4);
+                }
+            };
+
+            let content = match fs::read_to_string(&file) {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("{}: FAIL (read error: {})", file.display(), e);
+                    std::process::exit(1);
+                }
+            };
+
+            let packet = match parse_packet(&content) {
+                Ok(p) => p,
+                Err(e) => {
+                    eprintln!("{}: FAIL (parse error: {})", file.display(), e);
+                    std::process::exit(1);
+                }
+            };
+
+            let syntax_errors = validate_syntax(&packet);
+            let schema_errors = validate_schema(&packet, &workflows);
+
+            let mut all_errors = Vec::new();
+            for err in &syntax_errors {
+                all_errors.push(format!("  [{}] {}", err.code, err.message));
+            }
+            for err in &schema_errors {
+                all_errors.push(format!("  [{}] {}", err.code, err.message));
+            }
+
+            let safety_result = check_safety(&packet, &actions, &safety_rules, &workflows);
+            for rule in &safety_result.fired_rules {
+                all_errors.push(format!("  [{}] (safety)", rule));
+            }
+
+            if all_errors.is_empty() {
+                println!("{}: PASS", file.display());
+            } else {
+                println!("{}: FAIL", file.display());
+                for err in &all_errors {
+                    eprintln!("{}", err);
+                }
+                let exit_code = if !syntax_errors.is_empty() || !schema_errors.is_empty() {
+                    1
+                } else {
+                    2
+                };
+                std::process::exit(exit_code);
             }
         }
     }

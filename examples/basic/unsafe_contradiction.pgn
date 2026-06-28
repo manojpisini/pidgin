@@ -1,0 +1,9 @@
+@run unsafe.contradiction
+wf=generic_review
+mode=draft
+in=[primary_subject]
+out=[review_notes]
+do=[publish]
+deny=[publish]
+risk=low
+human=no

@@ -1,0 +1,8 @@
+@run unsafe.no_human
+wf=generic_review
+mode=draft
+in=[primary_subject]
+out=[review_notes]
+do=[publish]
+risk=low
+human=no

@@ -13,7 +13,7 @@ pub fn ident(input: &mut &str) -> ModalResult<String> {
 
 pub fn bare_word(input: &mut &str) -> ModalResult<String> {
     take_while(1.., |c: char| {
-        c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ':'
+        c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == ':' || c == '.'
     })
     .map(|s: &str| s.to_string())
     .parse_next(input)
