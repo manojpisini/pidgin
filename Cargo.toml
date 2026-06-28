@@ -1,3 +1,3 @@
 [workspace]
-members = ["crates/pidgin-lang", "crates/pidgin-lang-cli"]
+members = ["crates/pidgin-lang"]
 resolver = "2"
