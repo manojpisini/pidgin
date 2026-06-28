@@ -8,6 +8,17 @@ pub enum Directive {
     Context,
 }
 
+impl Directive {
+    pub fn directive_name(&self) -> &'static str {
+        match self {
+            Directive::Run => "run",
+            Directive::Result => "result",
+            Directive::Approval => "approval",
+            Directive::Context => "context",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum FieldValue {
     Scalar(String),
