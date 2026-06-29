@@ -1,6 +1,6 @@
 [package]
 name = "pidgin-lang"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 description = "A compact agent handoff protocol runtime — parse, validate, resolve, and expand Pidgin packets"
 license = "MIT OR Apache-2.0"
