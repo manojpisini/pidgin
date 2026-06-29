@@ -2,8 +2,31 @@
 
 **A compact protocol runtime for agent-to-agent handoffs.** Parse, validate, safety-check, resolve, expand, and log structured messages between agents — with no LLM in the hot path and no network calls in the core.
 
-```text
-Agent A ── .pgn ──→ Pidgin ── validate → safety → resolve → expand ──→ Agent B
+```
+                          ╔══════════════════════════════════════════╗
+                          ║          P I D G I N   R U N T I M E     ║
+                          ╚══════════════════════════════════════════╝
+
+     .pgn file            ┌──────┐   ┌───────┐   ┌─────────┐   ┌────────┐
+     ───────────────────→ │ LEX  │ → │ PARSE │ → │VALIDATE │ → │ SAFETY │
+     @run task.example    │tokens│   │  AST  │   │syntax+  │   │ SG 1-9 │
+     wf=generic_review    └──────┘   └───────┘   │ schema  │   │fail-cls│
+     mode=draft                                   └─────────┘   └────────┘
+     in=[...]                                                  │
+     out=[...]                                                  ▼
+     do=[draft,review]                                    ┌─────────┐   ┌────────┐
+     deny=[publish]                                       │ RESOLVE │ → │ EXPAND │
+     risk=med       Pipeline runs in ~5ms, no LLM calls   │refs→path│   │ → YAML │
+     human=yes                                            └─────────┘   └────────┘
+                                                                             │
+                                                                             ▼
+     result.pgn ◀────────────────────────────────────────────────── expanded packet
+     @result task.example                                                           
+     status=ok                                                  ┌────────┐
+     produced=[review_notes]                                    │ LOGGER │
+                                                                │append+ │
+                                                                │sanitize│
+                                                                └────────┘
 ```
 
 [![Crates.io](https://img.shields.io/crates/v/pidgin-lang.svg)](https://crates.io/crates/pidgin-lang)
@@ -104,15 +127,166 @@ The safety gate is the most important part of Pidgin. It enforces nine rules, an
 ## Multi-Agent Setup
 
 ```
-┌──────────┐   .pgn    ┌─────────────────────┐   expanded    ┌──────────┐
-│ LangGraph │ ──────→  │  Pidgin Runtime     │ ──────────→  │ Executor │
-│ CrewAI    │          │  parse→validate→    │              │ Agent    │
-│ A2A/MCP   │ ←──────  │  safety→resolve→    │ ←──────────  │ (Claude, │
-│ Custom    │  result  │  expand→log         │  result.pgn  │ Codex…)  │
-└──────────┘           └─────────────────────┘              └──────────┘
+                          ┌─────────────────────────────────────┐
+                          │         P I D G I N                 │
+                          │  parse → validate → safety → resolve│
+                          │  → expand → log                    │
+                          └─────────────────────────────────────┘
+                               ▲                    │
+                    .pgn       │                    │  expanded YAML
+                    packet     │                    ▼
+                ┌──────────────────┐       ┌──────────────────┐
+                │   Orchestrator    │       │  Executor Agent  │
+                │  ─────────────── │       │ ──────────────── │
+                │  LangGraph node  │       │  Claude          │
+                │  CrewAI agent    │       │  Codex           │
+                │  A2A Task handler│       │  Custom tool     │
+                │  MCP client      │       │  Shell script    │
+                │  Custom Python   │       │                  │
+                └──────────────────┘       └──────────────────┘
+                               ▲                    │
+                               │                    │
+                               └── result.pgn ──────┘
 ```
 
 The Python SDK (in `python/`) wraps the binary so orchestrators get typed objects without shelling out manually.
+
+## Wiring Pidgin into Any Multi-Agent System
+
+Each agent system gets its own `.pidgin/` directory with its own workflows, actions, and safety rules. The same binary, different configs per host.
+
+| System | `.pidgin/` Location | Setup |
+|--------|--------------------|-------|
+| LangGraph project | `./.pidgin/` in project root | Run `pgn init` in the project root. Add a Pidgin validation node between every agent-to-agent edge. The node calls `pgn check` on the source agent's output before passing it to the next agent. Expanded packets become typed state updates. |
+| CrewAI crew | `.pidgin/` in each crew's workspace | Each crew gets its own config. Create a custom CrewAI tool that wraps `pgn run`. Every inter-agent task output is validated before the next agent receives it. Blocked handoffs halt the crew and surface the SG rule that fired. |
+| CI pipeline | `.pidgin/` in repo root | Run `pgn check` on every `.pgn` file in CI. Validate that packets are well-formed and safe before merging. Use `pgn doctor` to verify the pipeline's own config is healthy. |
+| MCP server | `$PIDGIN_ROOT_DIR` env var | Set the env var to point to the config directory. Run Pidgin as an MCP server exposing `validate_packet`, `check_safety`, and `expand_packet` as tools. Any MCP client (Claude Desktop, etc.) can call them. |
+
+### Detailed Setup
+
+#### LangGraph
+
+```python
+from langgraph.graph import StateGraph, END
+import subprocess
+
+def pidgin_validate_node(state):
+    """Between any two agents, validate the handoff."""
+    pgn_text = state["agent_output"]  # produced by source agent
+    result = subprocess.run(
+        ["pgn", "check", "--host", "."],
+        input=pgn_text, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        state["error"] = f"Pidgin blocked: {result.stderr}"
+        return state  # route to error handler
+    # Safe — expand and pass to next agent
+    expanded = subprocess.run(
+        ["pgn", "expand", "--host", "."],
+        input=pgn_text, capture_output=True, text=True
+    )
+    state["agent_input"] = expanded.stdout
+    return state
+
+# Wire it: agent_a → pidgin_validate → agent_b → pidgin_validate → agent_c
+```
+
+#### CrewAI
+
+```python
+from crewai import Tool
+
+class PidginValidateTool(Tool):
+    name: str = "Pidgin Validate Handoff"
+    description: str = "Validate and expand a Pidgin packet before sending to next agent"
+
+    def _run(self, pgn_text: str) -> str:
+        result = subprocess.run(
+            ["pgn", "check", "--host", "."],
+            input=pgn_text, capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            raise ValueError(f"Handoff blocked: {result.stderr}")
+        expanded = subprocess.run(
+            ["pgn", "expand", "--host", "."],
+            input=pgn_text, capture_output=True, text=True
+        )
+        return expanded.stdout
+```
+
+#### CI Pipeline (GitHub Actions)
+
+```yaml
+# .github/workflows/pidgin-check.yml
+name: Pidgin Check
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - run: cargo install pidgin-lang
+      - run: pgn init --host .
+      - run: pgn doctor
+      - run: |
+          for f in $(find . -name '*.pgn'); do
+            pgn check "$f" || exit 1
+          done
+```
+
+#### MCP Server
+
+```python
+# pidgin_mcp_server.py
+from mcp.server import Server
+import subprocess, json
+
+app = Server("pidgin")
+
+@app.tool("check_safety")
+async def check_safety(pgn_text: str) -> str:
+    result = subprocess.run(
+        ["pgn", "check", "--host", "."],
+        input=pgn_text, capture_output=True, text=True
+    )
+    return json.dumps({
+        "pass": result.returncode == 0,
+        "output": result.stdout,
+        "errors": result.stderr
+    })
+
+@app.tool("expand_packet")
+async def expand_packet(pgn_text: str) -> str:
+    result = subprocess.run(
+        ["pgn", "expand", "--host", "."],
+        input=pgn_text, capture_output=True, text=True
+    )
+    return result.stdout if result.returncode == 0 else result.stderr
+```
+
+#### A2A (Agent2Agent) Integration
+
+Pidgin + A2A is a natural pair. Pidgin validates inside your trust boundary; A2A carries the expanded task across to external agents:
+
+```
+Your System                         External Agent Server
+┌──────────────────────────┐        ┌──────────────────────┐
+│ Agent A                  │        │ Agent B (external)   │
+│   produces .pgn          │        │                      │
+│       ↓                  │        │                      │
+│   Pidgin check → expand  │        │                      │
+│       ↓                  │        │                      │
+│   A2A client wraps       │──────→ │  A2A server receives │
+│   expanded YAML as       │ A2A    │  Task, routes to     │
+│   A2A Task (JSON-RPC)    │ Task   │  Agent B             │
+│                          │        │                      │
+│   A2A client receives    │←────── │  Agent B produces    │
+│   result, logs .pgn      │ result │  result              │
+└──────────────────────────┘        └──────────────────────┘
+```
+
+The expanded Pidgin packet becomes the payload body of an A2A Task. Pidgin handles validation, safety, and audit — A2A handles discovery, transport, and cross-org boundaries. They solve different problems and work best together.
 
 ## Host Configuration (`.pidgin/`)
 
