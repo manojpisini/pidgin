@@ -4,7 +4,6 @@
 
 [![Crates.io](https://img.shields.io/crates/v/pidgin-lang.svg)](https://crates.io/crates/pidgin-lang)
 [![Docs.rs](https://img.shields.io/docsrs/pidgin-lang)](https://docs.rs/pidgin-lang)
-[![CI](https://github.com/manojpisini/pidgin/actions/workflows/ci.yml/badge.svg)](https://github.com/manojpisini/pidgin/actions/workflows/ci.yml)
 
 ---
 
