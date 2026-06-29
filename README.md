@@ -1,33 +1,17 @@
-# Pidgin
+```
+████████████████████████████████████████████████████████
+██  ██ █████ █████ ██  ██ █████ █████ ██  ██ ██████
+██  ██ ██    ██    ██  ██  ████  ██  ██ ██  ██  ██
+██████ █████ █████  ████   █████ ████   ██    ██  ██
+██  ██ ██    ██    ██  ██  ████  ██  ██  ██  ██  ██
+██  ██ █████ █████ ██  ██ █████ █████  ████  ██████
+
+            THE AGENT HANDOFF PROTOCOL
+
+████████████████████████████████████████████████████████
+```
 
 **A compact protocol runtime for agent-to-agent handoffs.** Parse, validate, safety-check, resolve, expand, and log structured messages between agents — with no LLM in the hot path and no network calls in the core.
-
-```
-                          ╔══════════════════════════════════════════╗
-                          ║          P I D G I N   R U N T I M E     ║
-                          ╚══════════════════════════════════════════╝
-
-     .pgn file            ┌──────┐   ┌───────┐   ┌─────────┐   ┌────────┐
-     ───────────────────→ │ LEX  │ → │ PARSE │ → │VALIDATE │ → │ SAFETY │
-     @run task.example    │tokens│   │  AST  │   │syntax+  │   │ SG 1-9 │
-     wf=generic_review    └──────┘   └───────┘   │ schema  │   │fail-cls│
-     mode=draft                                   └─────────┘   └────────┘
-     in=[...]                                                  │
-     out=[...]                                                  ▼
-     do=[draft,review]                                    ┌─────────┐   ┌────────┐
-     deny=[publish]                                       │ RESOLVE │ → │ EXPAND │
-     risk=med       Pipeline runs in ~5ms, no LLM calls   │refs→path│   │ → YAML │
-     human=yes                                            └─────────┘   └────────┘
-                                                                             │
-                                                                             ▼
-     result.pgn ◀────────────────────────────────────────────────── expanded packet
-     @result task.example                                                           
-     status=ok                                                  ┌────────┐
-     produced=[review_notes]                                    │ LOGGER │
-                                                                │append+ │
-                                                                │sanitize│
-                                                                └────────┘
-```
 
 [![Crates.io](https://img.shields.io/crates/v/pidgin-lang.svg)](https://crates.io/crates/pidgin-lang)
 [![Docs.rs](https://img.shields.io/docsrs/pidgin-lang)](https://docs.rs/pidgin-lang)
