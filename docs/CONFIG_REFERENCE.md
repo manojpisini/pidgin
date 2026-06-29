@@ -1,172 +1,251 @@
-# Pidgin Configuration Reference
+# Configuration Reference
+
+Pidgin reads its configuration from `.pidgin/` in the working directory. All files are YAML. `pgn init` scaffolds all five with defaults.
+
+---
 
 ## `PIDGIN_RUNTIME_CONFIG.yaml`
 
+Top-level runtime behavior.
+
 ```yaml
+# Host identification — names this mount point
+host_name: "default-host"
+host_display_name: "Default Host"
+
+# Runtime behavior
 runtime:
-  name: pidgin
-  spec_version: "1.0"
-  strict_mode: true
-  default_dry_run: true
+  log_dir: ".pidgin/logs"
+  max_log_size_mb: 50
+  log_retention_days: 90
 
-host:
-  root: "."
-  inbox: ".pidgin/inbox"
-  outbox: ".pidgin/generated"
-  logs: ".pidgin/logs"
-  config_dir: ".pidgin"
-
-paths:
-  aliases: .pidgin/REFERENCE_ALIASES.yaml
-  workflow_registry: .pidgin/WORKFLOW_REGISTRY.yaml
-  action_registry: .pidgin/ACTION_REGISTRY.yaml
-  output_registry: .pidgin/OUTPUT_REGISTRY.yaml
-  safety_rules: .pidgin/SAFETY_RULES.yaml
-  token_budgets: .pidgin/TOKEN_BUDGETS.yaml
-
-logs:
-  agent_messages: .pidgin/logs/AGENT_MESSAGES.csv
-  protocol_errors: .pidgin/logs/PROTOCOL_ERRORS.csv
-  runtime_runs: .pidgin/logs/PIDGIN_RUNTIME_RUNS.csv
-  token_usage: .pidgin/logs/TOKEN_USAGE_LOG.csv
-
-defaults:
-  deny:
-    - publish
-    - send
-    - delete
-    - secrets
-    - credentials
-    - external_action
-  human_for_dangerous_actions: true
-  block_private_paths: true
-  estimate_tokens_by_chars: true
-```
-
-## `ACTION_REGISTRY.yaml`
-
-```yaml
-safe:
-  - read
-  - retrieve
-  - summarize
-  - classify
-  - draft
-  - review
-  - score
-  - rank
-  - flag
-  - compare
-  - extract
-  - package
-  - validate
-  - log
-  - index
-
-controlled:
-  - patch
-  - move
-  - rename
-  - update
-  - append
-  - reindex
-  - optimize
-  - compress
-  - expand
-  - rerank
-
-human_gated:
-  - publish
-  - send
-  - delete
-  - moderate
-  - archive
-  - credential
-  - approve
-  - reject
-  - promote_memory
-  - change_policy
-  - external_action
-```
-
-## `SAFETY_RULES.yaml`
-
-```yaml
+# Default deny — applied to every packet regardless of workflow
 default_deny:
   - publish
   - send
   - delete
-  - secrets
-  - credentials
-  - external_action
+  - deploy_to_prod
+  - destroy_infra
+  - modify_iam_role
+  - sign_artifact
+  - modify_ledger
+  - approve_bypass
 
-private_paths:
-  - ".env"
-  - ".env.*"
-  - "*.key"
-  - "*.pem"
-  - ".git/"
-  - "**/secrets/**"
-  - "**/.ssh/**"
-
-human_required:
-  actions:
-    - publish
-    - send
-    - delete
-    - moderate
-    - credential
-    - promote_memory
-    - external_action
-  risk_levels:
-    - high
-    - crit
-
-block_if:
-  action_in_do_and_deny: true
-  private_path_referenced: true
-  unknown_workflow: true
-  invalid_mode: true
-  missing_required_field: true
-  dangerous_action_without_human: true
+# Input limits — all enforced by the lexer
+limits:
+  max_packet_bytes: 1048576        # 1 MB
+  max_fields_per_packet: 100
+  max_field_length_chars: 10000
+  max_config_file_bytes: 10485760  # 10 MB
 ```
+
+`default_deny` is applied as if every packet included `deny=[...]`. It is additive — a packet's explicit `deny` merges with these defaults.
+
+---
 
 ## `WORKFLOW_REGISTRY.yaml`
 
+Define every workflow that Pidgin will accept. Unknown workflows are rejected at the schema validation stage (SG-5).
+
 ```yaml
 workflows:
-  generic_review:
-    description: Review a piece of content or code against a set of source references.
+  - id: generic_review
+    display_name: "Generic Review"
+    description: "Standard content review workflow"
     risk_default: med
-    allowed_modes: [draft, review, approval]
-    required_inputs: [primary_subject, source_refs]
-    expected_outputs: [review_notes, risk_flags, approval]
-    recommended_executor: claude-code
-    fallback_executor: opencode
+    allowed_modes:
+      - draft
+      - review
+      - rewrite
+      - finalize
+    allowed_actions:
+      - draft
+      - review
+      - edit
+      - request_changes
+      - approve
+      - rewrite
+      - finalize
+    required_inputs:
+      - primary_subject
+      - source_refs
+    expected_outputs:
+      - review_notes
+      - suggested_changes
+    recommended_executor: "claude-sonnet-4"
+    human_approval_required: false
 
-  generic_health_check:
-    description: Check a host's structure, configuration, and logs for drift or errors.
-    risk_default: low
-    allowed_modes: [review, patch]
-    required_inputs: [host_tree, configs, logs]
-    expected_outputs: [health_report, review_required]
-    recommended_executor: opencode
-    fallback_executor: claude-code
+  - id: publish_content
+    display_name: "Publish Content"
+    description: "Push content to production"
+    risk_default: high
+    allowed_modes:
+      - staging
+      - production
+    allowed_actions:
+      - stage
+      - publish
+      - unpublish
+      - schedule
+    required_inputs:
+      - content_item
+      - target_channel
+    expected_outputs:
+      - publication_record
+    recommended_executor: "claude-sonnet-4"
+    human_approval_required: true
 
-  generic_draft_and_distribute:
-    description: Draft a piece of output content from a source and prepare it for
-      multiple destination formats, gated on human approval before anything is sent.
-    risk_default: med
-    allowed_modes: [draft, review, approval]
-    required_inputs: [source, style_guide]
-    expected_outputs: [drafts, approval]
-    recommended_executor: claude-code
-    fallback_executor: codex
+  - id: emergency_rollback
+    display_name: "Emergency Rollback"
+    description: "Revert a published change immediately"
+    risk_default: crit
+    allowed_modes:
+      - production
+    allowed_actions:
+      - rollback
+      - notify
+      - log_incident
+    required_inputs:
+      - content_item
+      - rollback_target
+    expected_outputs:
+      - rollback_audit
+    recommended_executor: "claude-sonnet-4"
+    human_approval_required: true
+
+routing_rules:
+  - workflow_match: ["generic_review"]
+    preferred_executor: "claude-sonnet-4"
+  - workflow_match: ["publish_content", "emergency_rollback"]
+    preferred_executor: "claude-sonnet-4"
+  - workflow_match: ["*"]                     # catch-all
+    preferred_executor: "claude-sonnet-4"
 ```
+
+`human_approval_required` at the workflow level means SG-2 fires unless `human=yes` is present. The field also pre-populates router suggestions.
+
+---
+
+## `ACTION_REGISTRY.yaml`
+
+Actions are categorized into three tiers. The tier determines what safety scrutiny an action receives beyond SG-2/SG-3.
+
+```yaml
+tiers:
+  safe:
+    description: "Always allowed with no additional validation"
+    actions:
+      - draft
+      - review
+      - edit
+      - request_changes
+      - rewrite
+      - finalize
+      - notify
+      - log_incident
+      - stage
+      - schedule
+
+  controlled:
+    description: "Allowed with automated validation"
+    actions:
+      - approve
+      - unpublish
+      - rollback
+      - deploy_to_staging
+
+  human_gated:
+    description: "Requires explicit human approval (human=yes)"
+    actions:
+      - publish
+      - send
+      - delete
+      - deploy_to_prod
+      - destroy_infra
+      - modify_iam_role
+      - sign_artifact
+      - modify_ledger
+      - approve_bypass
+```
+
+A packet's `do` list is checked against these tiers. `human_gated` actions trigger SG-2 even if the workflow default is `human_approval_required: false`.
+
+---
+
+## `SAFETY_RULES.yaml`
+
+Customize safety gate behavior: deny list, private path patterns, and per-risk-level human approval requirements.
+
+```yaml
+default_deny_list:
+  - publish
+  - send
+  - delete
+  - deploy_to_prod
+  - destroy_infra
+  - modify_iam_role
+  - sign_artifact
+  - modify_ledger
+  - approve_bypass
+
+private_path_patterns:
+  - "**/.env*"
+  - "**/.ssh/**"
+  - "**/*.pem"
+  - "**/*.key"
+  - "**/secrets/**"
+  - "**/credentials/**"
+  - "**/service-account*"
+  - "**/*.envrc"
+  - "**/SECRETS*"
+  - "**/*config*secret*"
+
+human_approval_rules:
+  human_required_actions:
+    - publish
+    - send
+    - delete
+    - deploy_to_prod
+    - destroy_infra
+    - modify_iam_role
+    - sign_artifact
+    - modify_ledger
+    - approve_bypass
+    - rollback
+  human_required_risk_levels:
+    - high
+    - crit
+```
+
+`private_path_patterns` feeds SG-4. Patterns use gitignore-style glob matching. `human_required_actions` feeds SG-2 alongside the action registry's `human_gated` tier.
+
+---
 
 ## `REFERENCE_ALIASES.yaml`
 
+Short aliases for references so packets don't need full `namespace:id` syntax. A bare identifier like `primary_subject` in a packet's `in` list is resolved through this file first.
+
 ```yaml
-aliases: {}
-common: {}
+aliases:
+  primary_subject: "ep:UNIT012"
+  source_refs: "file:refs/sources.yaml"
+  review_notes: "ledger:REV001"
+  suggested_changes: "ledger:REV001/CHANGES"
+  content_item: "ep:UNIT012"
+  target_channel: "claim:CHANNEL001"
+  rollback_target: "rb:RB001"
+  publication_record: "ledger:PUB001"
+  rollback_audit: "ledger:RA001"
+```
+
+Aliases are resolved left-to-right and can chain (alias mapping to another alias). Circular references are detected and reported.
+
+---
+
+## Config File Locations
+
+Pidgin searches for `.pidgin/` in the current working directory. The `PIDGIN_ROOT_DIR` environment variable overrides this for scripts or non-interactive use:
+
+```bash
+export PIDGIN_ROOT_DIR=/path/to/custom/.pidgin/
 ```

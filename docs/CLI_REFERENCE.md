@@ -1,110 +1,131 @@
-# Pidgin CLI Reference
+# CLI Reference
 
-Binary name: `pgn`
+## `pgn init`
 
-## Commands
+Scaffold `.pidgin/` directory with default configuration files.
 
-### `pgn init`
-
-```bash
-pgn init [--host .]
+```
+pgn init
 ```
 
-Creates the host's `config_dir` (default `.pidgin/`) with default registries, plus `inbox`, `generated`, and `logs` directories. Idempotent — running twice never overwrites existing customized registries.
+Creates `.pidgin/` in the current working directory with five YAML files, each populated with default values. Safe to re-run — will not overwrite existing files.
 
-### `pgn parse`
+## `pgn parse <path>`
 
-```bash
-pgn parse <file> [--format json|yaml] [--pretty]
+Lex and parse a `.pgn` packet file, printing the typed AST to stdout.
+
+```
+pgn parse examples/basic/generic_task.pgn
 ```
 
-Outputs the parsed AST. Exit code `0` on success, `1` on a syntax error.
+Output shows each token and the structured `PgnPacket` with all fields, including the header (directive + run_id) and each typed field.
 
-### `pgn validate`
+## `pgn validate <path>`
 
-```bash
-pgn validate <file>... [--host .]
+Syntax + schema validation.
+
+```
+pgn validate examples/basic/generic_task.pgn
 ```
 
-Runs syntax + schema validation only. Exit codes: `0` valid, `1` invalid.
+Checks field presence against the directive schema and field types against allowed values. Exits 1 on any violation.
 
-### `pgn check`
+## `pgn check <path>`
 
-```bash
-pgn check <file> [--host .]
+Full end-to-end guard: validate → safety gate → resolve references.
+
+```
+pgn check examples/basic/unsafe_contradiction.pgn
+pgn check examples/basic/unsafe_no_human.pgn
+pgn check examples/basic/unsafe_private_path.pgn
 ```
 
-Runs validate → safety gate → resolve, end to end. "Tell me everything that's wrong, fast."
+Runs all pipeline stages except expansion and logging. Best for quick safety reviews. Exits 0 if clean, 2 if safety blocks.
 
-### `pgn expand`
+## `pgn resolve <path>`
 
-```bash
-pgn expand <file> [--host .] [--out <path>] [--packet run|approval|context]
+Expand all short references to their real paths/IDs.
+
+```
+pgn resolve examples/basic/generic_task.pgn
 ```
 
-Options: `--format yaml|json`, `--packet run|approval|context`.
+Prints the packet with every reference resolved against `REFERENCE_ALIASES.yaml` and the filesystem. Unresolved required references cause exit 3.
 
-### `pgn resolve`
+## `pgn expand <path>`
 
-```bash
-pgn resolve <file> [--host .]
+Full pipeline: parse → validate → safety → resolve → expand.
+
+```
+pgn expand examples/basic/generic_task.pgn
 ```
 
-Prints every reference and its resolution status/confidence.
+Produces a fully-specified YAML packet with every field expanded, every reference resolved, and safety annotations. The output is what an executor would act on.
 
-### `pgn context-plan`
+## `pgn run <path>`
 
-```bash
-pgn context-plan <file> [--host .] [--out <path>]
+Same as `expand` plus structured logging.
+
+```
+pgn run examples/basic/generic_task.pgn
 ```
 
-### `pgn measure`
+Appends the expanded packet to `.pidgin/logs/` with a timestamp and run_id. This is the production command.
 
-```bash
-pgn measure <file>
+## `pgn measure <path>`
+
+Estimate token cost of a packet.
+
+```
+pgn measure examples/basic/generic_task.pgn
 ```
 
-Shows token estimates for the raw packet.
+Prints a breakdown: header tokens, field tokens, list tokens, reference tokens, total. Uses a simple estimation model (blanket tokens = 0.25 * packet_content_length, packet tokens = length / 4).
 
-### `pgn compare`
+## `pgn compare <path>`
 
-```bash
-pgn compare <pgn-file> --verbose <verbose-file>
+Compare Pidgin token cost vs equivalent verbose description.
+
+```
+pgn compare examples/basic/generic_task.pgn
 ```
 
-Shows the `TokenSavingsReport`.
+If the packet has a `note` field, that note is used as the verbose baseline. Otherwise, a verbose description is generated. Shows % savings.
 
-### `pgn run`
+## `pgn context-plan <path>`
 
-```bash
-pgn run <file> [--host .] [--dry-run] [--execute]
+Build a structured context-retrieval plan from the packet's `in` references.
+
+```
+pgn context-plan examples/basic/generic_task.pgn
 ```
 
-Runs the entire pipeline. `--dry-run` is the default — writes no files outside logs and performs no external actions.
+Each reference is annotated with its resolved type and a retrieval strategy. This plan can be passed to a retrieval layer.
 
-### `pgn watch`
+## `pgn doctor`
 
-```bash
-pgn watch <folder> [--host .]
+Check host configuration.
+
+```
+pgn doctor
 ```
 
-Watches for new `.pgn` files → validate → expand → write to outbox → log.
+Verifies `.pidgin/` exists, each config file is valid YAML with the expected keys, and basic path resolution works. Useful for debugging host setup.
 
-### `pgn doctor`
+## `pgn docs`
 
-```bash
-pgn doctor [--host .]
+Print full protocol documentation as markdown to stdout.
+
+```
+pgn docs > pidgin-protocol.md
 ```
 
-Checks config files, log directories, schemas, and example packets.
+Intended for agent consumption — agents can pipe this into their context window to understand Pidgin protocol without leaving their environment.
 
-## Exit Codes
+## `pgn --help` / `pgn -h`
 
-| Code | Meaning |
-|------|---------|
-| 0 | success |
-| 1 | validation error (syntax or schema) |
-| 2 | safety blocked (one or more SG-n rules fired) |
-| 3 | reference missing/unresolved (and was required) |
-| 4 | config error (host contract paths missing, registry malformed) |
-| 5 | runtime/internal error (should never happen; always a bug report) |
+Print usage summary with all available commands.
+
+## `pgn --version` / `pgn -V`
+
+Print the installed version.

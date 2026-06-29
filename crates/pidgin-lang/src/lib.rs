@@ -1,206 +1,356 @@
 //! # Pidgin — A Compact Agent Handoff Protocol & Runtime
 //!
-//! Pidgin is a small, fast, local-first **protocol and runtime** for compact, structured
-//! handoffs between AI agents, between an agent and a human operator, and between an
-//! orchestrator and the tools/executors it drives.
+//! Pidgin is a minimal, local-first protocol runtime for structured, validated
+//! handoffs between AI agents. It parses a compact nine-line text packet, runs
+//! it through a deterministic pipeline (validate → safety check → resolve →
+//! expand), and produces an executable YAML specification — all without calling
+//! a single LLM or opening a single network socket.
 //!
 //! ```text
-//! Take a compact Pidgin packet (9 lines of key=value text)
-//! → parse it
-//! → validate it against a schema and registries
-//! → run it through a safety gate
-//! → resolve short references into real paths/IDs
-//! → expand it into a fully-specified, executable packet
-//! → estimate token cost
-//! → recommend a route
-//! → log every step
+//! .pgn file (9 lines of key=value text)
+//!     │
+//!     ▼
+//! ┌─────────────┐
+//! │   Lexer     │  winnow tokenizer, input limits
+//! └─────────────┘
+//!     │
+//!     ▼
+//! ┌─────────────┐
+//! │   Parser    │  typed AST (PgnPacket)
+//! └─────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │ Syntax Validator  │  required fields present? types correct?
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │ Schema Validator  │  workflow/mode/risk legal against registries?
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │   Safety Gate     │  9 rules (SG-1 through SG-9), fail closed
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │ Reference Resolver │ short refs → canonical paths/IDs
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │  Packet Expander   │  fully-specified executable YAML
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │  Context Planner   │  what to retrieve and how
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │  Token Estimator    │  packet + context token cost
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │  Router Planner     │  recommended executor
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! ┌──────────────────┐
+//! │  Logger              │  every step writes structured log
+//! └──────────────────┘
+//!     │
+//!     ▼
+//! Expanded packet, ready for: dry-run report | execution | human approval queue
 //! ```
 //!
-//! Pidgin is **not** a model, not an agent framework, not a replacement for
-//! MCP/A2A/ACP. It is a narrow waist — a deliberately minimal layer that sits
-//! between whatever produces a task and whatever executes it.
+//! # Why This Exists
 //!
-//! # Background
+//! Every serious study of multi-agent token cost in 2025–2026 converges on the
+//! same finding: the communication layer is the dominant cost and failure
+//! surface, not the reasoning layer. Agents pass verbose natural-language
+//! messages to each other — paragraphs of implicit instructions, unclearly
+//! scoped tasks, unvalidated assumptions. Each handoff costs hundreds or
+//! thousands of tokens. Worse, there's no validation: Agent B can interpret
+//! Agent A's message differently from what Agent A intended, and nobody audits
+//! it until something breaks.
 //!
-//! Every serious 2025–2026 study of multi-agent token cost reaches the same
-//! conclusion: the dominant cost and failure surface in multi-agent LLM systems
-//! is the communication layer itself, not the reasoning layer.  Replace verbose
-//! natural-language handoffs with a small, typed, validated wire format, and
-//! you cut both token use and error rate without touching the models.
+//! Pidgin formalizes the narrow waist between agents into a typed, validated,
+//! safety-checked wire format. The packet is nine lines. The entire runtime
+//! pipeline — lex, parse, validate, safety, resolve, expand, log — runs in
+//! single-digit milliseconds on a laptop. You can audit every handoff because
+//! every handoff is logged to a structured file.
 //!
-//! Pidgin formalizes that conclusion into a runtime instead of a one-off convention.
+//! Pidgin is not an orchestrator. It does not run agents, it does not make
+//! decisions, it does not call models. It sits between whatever produces a task
+//! (a LangGraph node, a CrewAI agent, a human typing at a terminal) and
+//! whatever executes it (Claude, Codex, a shell script), and ensures the
+//! handoff is parseable, safe, and logged.
 //!
 //! # Quick Start
 //!
 //! ```bash
 //! cargo install pidgin-lang
-//!
-//! # Scaffold a host configuration
-//! pgn init
-//!
-//! # Parse a packet
+//! pgn init                   # scaffold .pidgin/ config
 //! pgn parse examples/basic/generic_task.pgn
-//!
-//! # Full pipeline
 //! pgn run examples/basic/generic_task.pgn
-//!
-//! # Check (validate + safety + resolve)
-//! pgn check examples/basic/generic_task.pgn
-//!
-//! # Token-cost estimation
+//! pgn check examples/basic/unsafe_contradiction.pgn
 //! pgn measure examples/basic/generic_task.pgn
-//!
-//! # Validate host configuration
 //! pgn doctor
-//! ```
-//!
-//! # Architecture
-//!
-//! The runtime is a linear pipeline — each stage is a pure function that
-//! transforms or inspects the packet:
-//!
-//! ```text
-//! Pidgin packet (.pgn text)
-//!    │
-//!    ▼
-//! ┌─────────────┐
-//! │   Lexer     │  winnow tokenizer
-//! └─────────────┘
-//!    │
-//!    ▼
-//! ┌─────────────┐
-//! │   Parser    │  builds typed AST (PgnPacket)
-//! └─────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │ Syntax Validator  │  required fields present? types correct?
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │ Schema Validator  │  workflow/mode/risk values legal against registries
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │   Safety Gate     │  contradiction check, deny precedence, human-required
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │ Reference Resolver │ short refs → real paths/IDs with confidence scores
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │  Packet Expander   │  builds fully-specified executable packet (YAML)
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │  Context Planner   │  decides what to retrieve and how
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │  Token Estimator    │  estimates packet + context token cost
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │  Router Planner     │  recommends an executor
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! ┌──────────────────┐
-//! │  Logger / Metrics    │  every step writes a structured log row
-//! └──────────────────┘
-//!    │
-//!    ▼
-//! Expanded packet, ready for: dry-run report | execution handoff | human approval queue
 //! ```
 //!
 //! # Packet Grammar
 //!
-//! A Pidgin packet is plain text — a header line followed by `key=value` fields:
+//! A Pidgin packet is plain text with a strict, unambiguous grammar. There is
+//! no nesting, no optional syntax, no inline markup — every byte is either a
+//! header, a field, a list element, or a comment.
+//!
+//! ## Header
 //!
 //! ```text
-//! @run task.example
-//! wf=generic_review
-//! mode=draft
-//! in=[primary_subject,source_refs]
-//! out=[review_notes]
-//! do=[draft,review]
-//! deny=[publish,send,delete,secrets]
-//! risk=med
-//! human=yes
+//! @<directive> <run_id>
 //! ```
 //!
-//! **Directives:** `@run`, `@result`, `@approval`, `@context`
+//! Four directives:
 //!
-//! **Reference syntax** (inside lists and the `route` field):
-//! - Namespace ref: `namespace:id` — e.g. `file:src/main.rs`, `ep:UNIT012`
-//! - Bare alias: resolved through `REFERENCE_ALIASES.yaml`
+//! | Directive | Purpose |
+//! |-----------|---------|
+//! | `@run` | A task for an agent to execute |
+//! | `@result` | The outcome of a completed task |
+//! | `@approval` | Human sign-off for a critical-risk task |
+//! | `@context` | A request for additional information |
 //!
-//! # Safety Gate
+//! `run_id` is a dotted identifier — `task.example`, `docs.review.2026-06-01` —
+//! that uniquely identifies the handoff across the system.
 //!
-//! The safety gate enforces 9 numbered rules (SG-1 through SG-9):
+//! ## Fields
 //!
-//! | Rule | Description |
-//! |------|-------------|
-//! | SG-1 | Action in both `do` and `deny` → blocked |
-//! | SG-2 | Human-gated action without `human=yes` → blocked |
-//! | SG-3 | High/critical risk forces `human=yes`, cannot override |
-//! | SG-4 | References resolving to private paths → blocked |
-//! | SG-5 | Unknown workflow → blocked |
-//! | SG-6 | Invalid mode → blocked |
-//! | SG-7 | Free-text `note` field is never parsed for instructions |
-//! | SG-8 | Unresolved required inputs → expansion blocked |
-//! | SG-9 | Critical risk requires an `@approval` packet |
+//! Every field is `key=value` on its own line. Whitespace around `=` is not
+//! allowed, which eliminates an entire class of lexer ambiguities.
 //!
-//! **Safety-first principle:** If the runtime is ever uncertain, it fails closed
-//! (blocks, asks for human approval, or refuses to expand) rather than fail open.
+//! ```text
+//! wf=generic_review          # bare scalar
+//! risk=med                   # bare scalar (allowed values depend on workflow)
+//! in=[primary_subject,refs]  # list — comma-separated, no spaces
+//! note="Draft only"          # quoted string (for free text)
+//! ```
+//!
+//! ### Scalar fields
+//!
+//! | Field | Type | Appears On |
+//! |-------|------|------------|
+//! | `wf` | bare word | all directives |
+//! | `mode` | bare word | `@run`, `@context` |
+//! | `risk` | `low │ med │ high │ crit` | `@run`, `@approval` |
+//! | `human` | `yes │ no` | `@run`, `@approval` |
+//! | `status` | `ok │ fail │ partial` | `@result`, `@approval` |
+//! | `ttl` | integer | all directives |
+//! | `note` | quoted string | all directives |
+//!
+//! ### List fields
+//!
+//! | Field | Appears On | Contents |
+//! |-------|------------|----------|
+//! | `in` | `@run`, `@context` | Input references |
+//! | `out` | `@run`, `@result` | Output references |
+//! | `do` | `@run` | Actions to perform |
+//! | `deny` | `@run` | Actions to explicitly deny |
+//! | `produced` | `@result` | References to produced artifacts |
+//!
+//! ## Reference syntax
+//!
+//! Inside list fields, references can be either:
+//!
+//! - **Namespaced:** `namespace:id` — e.g. `file:src/main.rs`, `ep:UNIT012`
+//! - **Bare alias:** `primary_subject` — resolved through `REFERENCE_ALIASES.yaml`
+//!
+//! Built-in namespaces:
+//!
+//! | Namespace | What It References |
+//! |-----------|-------------------|
+//! | `ep` | Entity pointer — a content item, document, or record |
+//! | `rb` | Rollback target — a point-in-time snapshot |
+//! | `ledger` | Ledger entry — an audit record |
+//! | `claim` | Claim — a config key, channel, or property |
+//! | `policy` | Policy — a rule file or constraints document |
+//! | `skill` | Skill — a capability or tool definition |
+//! | `wf` | Workflow — a workflow definition |
+//! | `file` | File path (checked against safety rules) |
+//! | `folder` | Directory path (checked against safety rules) |
+//! | `dash` | Dashboard — a view or report |
+//! | `queue` | Queue — a named message queue |
+//!
+//! # Safety Gate (SG-1 through SG-9)
+//!
+//! The safety gate is the core safety mechanism. It is a separate pipeline stage
+//! — it runs after parsing and validation but before reference resolution and
+//! expansion. It cannot be disabled, skipped, or overridden by packet fields.
+//!
+//! Every rule fails closed: if the gate cannot determine whether a rule applies,
+//! it treats the rule as violated.
+//!
+//! ## SG-1 — Contradiction
+//!
+//! An action cannot appear in both `do` and `deny`. If a packet says both
+//! "do publish" and "deny publish", something is wrong. The runtime refuses
+//! to guess which intent is correct.
+//!
+//! ## SG-2 — Missing Human Approval
+//!
+//! If a packet requests a human-gated action (publishing, deleting, sending
+//! credentials, etc.) without `human=yes`, the gate blocks. Human-gated actions
+//! are defined in `ACTION_REGISTRY.yaml` as the `human_gated` tier plus
+//! `human_required_actions` in `SAFETY_RULES.yaml`.
+//!
+//! ## SG-3 — Forced Human Approval
+//!
+//! High- or critical-risk packets cannot opt out of human review. Even if the
+//! packet declares `human=no`, the gate overrides it. This prevents a risky
+//! packet from bypassing human oversight by lying about its own `human` field.
+//!
+//! ## SG-4 — Private Path Access
+//!
+//! Any `file:` or `folder:` reference that resolves to a path matching a
+//! private path pattern (`.env`, `.ssh/`, `*.pem`, `secrets/`, etc.) is
+//! blocked. Paths are canonicalized before matching, so symlink tricks and
+//! traversal sequences (`../../etc/passwd`, `%2e%2e`) are caught.
+//!
+//! ## SG-5 — Unknown Workflow
+//!
+//! The `wf` field must match a workflow defined in `WORKFLOW_REGISTRY.yaml`.
+//! An unknown workflow is not a no-op — it is a bug or an attack.
+//!
+//! ## SG-6 — Invalid Mode
+//!
+//! The `mode` field must be in the workflow's `allowed_modes` list. A
+//! `generic_review` workflow should never be executed in `production` mode.
+//!
+//! ## SG-7 — Note Isolation
+//!
+//! The `note` field stores free text. No pipeline stage reads or interprets it.
+//! This is structural: the note is an opaque string throughout the entire
+//! pipeline. If you want an agent to read a note, the expanded packet makes
+//! it available, but the runtime never acts on its contents. This closes
+//! the most obvious prompt-injection surface.
+//!
+//! ## SG-8 — Unresolved Required Input
+//!
+//! If a required input reference fails to resolve (the alias is not in
+//! `REFERENCE_ALIASES.yaml` and the namespace:id doesn't exist), expansion
+//! is blocked. Running with missing inputs produces silent failures.
+//!
+//! ## SG-9 — Critical Risk Requires Approval Packet
+//!
+//! A packet with `risk=crit` requires a separate `@approval` packet with
+//! `status=ok` before it can be expanded. A single `human=yes` on the same
+//! packet is not enough — the two-packet pattern ensures separation of
+//! concerns.
 //!
 //! # Multi-Agent Integration
 //!
-//! Pidgin is the handoff *format* between agents, not an orchestrator itself.
-//! The integration pattern is:
+//! Pidgin is the handoff *format*, not the orchestrator. Here is how it fits
+//! into various agent architectures:
 //!
 //! ```text
-//! Agent A (orchestrator) ──produces .pgn──→ Pidgin (validate→safety→resolve→expand)
-//!                                                                                │
-//!                                                                           result .pgn
-//!                                                                                │
-//!                                                                           Pidgin (validate→log)
-//!                                                                                │
-//! Agent A ◀──────────────────────── reads result ────────────────────────────────┘
+//!                                          expanded .pgn
+//! Orchestrator ─── .pgn ──→ Pidgin ──────────────────────────→ Executor Agent
+//! (LangGraph,    ←──────  (validate, safety,    ←──────────  (Claude, Codex,
+//!  CrewAI,       result    resolve, expand,      result       shell, tool)
+//!  A2A, MCP)               log)
 //! ```
 //!
-//! ## Integration with Orchestrator Frameworks
+//! ## LangGraph
 //!
-//! - **LangGraph**: A Pidgin node parses/validates the packet before routing to
-//!   the next agent. Expanded packets become structured messages in the graph state.
+//! Add a Pidgin node between any two agent nodes. The Pidgin node parses and
+//! validates the `.pgn` packet produced by the source agent, routes to the
+//! destination agent based on the expanded packet, and logs the handoff to the
+//! shared graph state. The flow remains typed and auditable.
 //!
-//! - **CrewAI**: Each agent's task output is a `.pgn` packet; Pidgin validates
-//!   inter-agent handoffs.
+//! ## CrewAI
 //!
-//! - **A2A (Agent2Agent)**: Pidgin's expanded Run Packet is the payload inside
-//!   an A2A Task when crossing trust boundaries.
+//! Each CrewAI agent produces a `.pgn` packet as its task output. A custom
+//! CrewAI tool wraps `pgn run` (or the library) to validate inter-agent
+//! handoffs. Invalid or unsafe handoffs block before reaching the next agent.
 //!
-//! - **MCP (Model Context Protocol)**: Pidgin runs as an MCP server, exposing
-//!   `parse`, `validate`, `expand` as MCP tools.
+//! ## A2A (Agent2Agent)
+//!
+//! Pidgin's expanded Run Packet maps naturally into an A2A Task. The `.pgn`
+//! format becomes the wire representation inside trust boundaries; the expanded
+//! A2A Task is the representation crossing them. Pidgin's safety gate provides
+//! the guardrails that A2A intentionally leaves to implementors.
+//!
+//! ## MCP (Model Context Protocol)
+//!
+//! Pidgin can run as an MCP server, exposing `parse`, `validate`, `check`,
+//! and `expand` as MCP tools. Agents connected through MCP call these tools
+//! as part of their workflow, getting structured, validated handoffs without
+//! leaving the MCP protocol.
 //!
 //! ## Python SDK
 //!
-//! A Python SDK (scaffolded in `python/`) wraps the `pgn` binary as a subprocess
-//! or via PyO3 bindings, providing typed Pydantic models so orchestrators get
-//! Python objects instead of raw CLI output.
+//! The Python SDK (scaffolded in `python/`) wraps the `pgn` binary via
+//! subprocess, giving Python-based orchestrators (LangChain, CrewAI,
+//! custom scripts) typed Pydantic models for packets, safety results, and
+//! expanded output. PyO3 bindings are on the roadmap.
 //!
-//! ## Hooking into the Pipeline
+//! # Host Configuration
 //!
-//! Each stage in the pipeline is a public function you can call from your own
-//! code:
+//! Every Pidgin host provides a `.pidgin/` directory with five YAML config
+//! files. Run `pgn init` to scaffold default versions.
+//!
+//! | File | What It Defines |
+//! |------|----------------|
+//! | `PIDGIN_RUNTIME_CONFIG.yaml` | Host name, log directory, default deny list, input limits (1 MB max packet, 100 max fields, 10K max field length, 10 MB max config) |
+//! | `WORKFLOW_REGISTRY.yaml` | Workflow definitions — each with risk default, allowed modes, required inputs, expected outputs, recommended executor, and human-approval requirement |
+//! | `ACTION_REGISTRY.yaml` | Three tiers: `safe` (always allowed), `controlled` (allowed with validation), `human_gated` (requires `human=yes`) |
+//! | `SAFETY_RULES.yaml` | Default deny list, gitignore-style private path patterns, human-required actions and risk levels |
+//! | `REFERENCE_ALIASES.yaml` | Short-name aliases mapping bare identifiers to full `namespace:id` references |
+//!
+//! Config files are loaded at startup from the host root (`.` or
+//! `$PIDGIN_ROOT_DIR`). Each file is validated for structure and key presence.
+//!
+//! # CLI
+//!
+//! The `pgn` binary exposes every pipeline stage as a subcommand plus
+//! infrastructure commands:
+//!
+//! | Command | Action |
+//! |---------|--------|
+//! | `init` | Scaffold `.pidgin/` directory |
+//! | `parse <path>` | Lex and parse, print AST |
+//! | `validate <path>` | Syntax + schema validation |
+//! | `check <path>` | Full guard: validate → safety → resolve |
+//! | `resolve <path>` | Expand short references |
+//! | `expand <path>` | Full pipeline → executable YAML |
+//! | `run <path>` | Full pipeline + structured logging |
+//! | `measure <path>` | Estimate token cost |
+//! | `compare <path>` | Compare vs verbose token cost |
+//! | `context-plan <path>` | Build retrieval plan |
+//! | `doctor` | Check host configuration health |
+//! | `docs` | Print full protocol documentation |
+//!
+//! Exit codes:
+//! - `0` success
+//! - `1` validation error (syntax or schema)
+//! - `2` safety gate blocked
+//! - `3` unresolved required reference
+//! - `4` configuration error
+//! - `5` internal error (file a bug)
+//!
+//! # Using as a Library
+//!
+//! Add to `Cargo.toml`:
+//!
+//! ```toml
+//! [dependencies]
+//! pidgin-lang = "0.1"
+//! ```
+//!
+//! Then compose your own pipeline:
 //!
 //! ```rust
 //! use pidgin_lang::parser::parse_packet;
@@ -211,100 +361,100 @@
 //!     .expect("valid packet");
 //! ```
 //!
-//! You can hook into any individual stage, skip stages, or compose them in
-//! custom orders depending on your use case.
+//! Every stage function is public and well-typed. You can:
 //!
-//! # Host Configuration
+//! - Call only the parser (if you just need an AST)
+//! - Call validate + safety without resolving (quick check)
+//! - Skip the safety gate in test/development only
+//! - Add custom stages before or after any built-in stage
+//! - Implement your own logger by implementing the `Logger` trait
 //!
-//! Pidgin reads its configuration from `.pidgin/` in the host directory.
-//! Use `pgn init` to scaffold the default config:
+//! # Safety Properties
 //!
-//! ```bash
-//! pgn init
-//! ```
+//! Beyond the safety gate, several cross-cutting properties hold:
 //!
-//! | File | Purpose |
-//! |------|---------|
-//! | `WORKFLOW_REGISTRY.yaml` | Workflow definitions with modes, inputs, executors |
-//! | `ACTION_REGISTRY.yaml` | Action tiers: `safe`, `controlled`, `human_gated` |
-//! | `SAFETY_RULES.yaml` | Default denies, private paths, human approval rules |
-//! | `REFERENCE_ALIASES.yaml` | Short-name aliases for frequently-used references |
-//! | `PIDGIN_RUNTIME_CONFIG.yaml` | Runtime settings (paths, modes, defaults) |
-//!
-//! # CLI Reference
-//!
-//! | Command | Description |
-//! |---------|-------------|
-//! | `pgn init [--host .] [--force]` | Scaffold default `.pidgin/` config |
-//! | `pgn parse <file>` | Parse a packet and print the AST |
-//! | `pgn validate <files> --host .` | Validate syntax + schema against registries |
-//! | `pgn check <file> --host .` | Parse → validate → safety → resolve (end-to-end) |
-//! | `pgn resolve <file> --host .` | Resolve all short references |
-//! | `pgn expand <file> --host . [--out file]` | Expand into executable YAML |
-//! | `pgn context-plan <file> --host .` | Build a context retrieval plan |
-//! | `pgn measure <file>` | Estimate token cost |
-//! | `pgn compare --pgn <file> --verbose <file>` | Compare Pidgin vs verbose token cost |
-//! | `pgn run <file> --host . [--out file]` | Full pipeline end-to-end |
-//! | `pgn doctor --host .` | Check host configuration |
+//! - **No network calls in core.** The runtime never opens a socket or makes
+//!   an HTTP request. There is no network attack surface.
+//! - **No LLM in the hot path.** Every stage is deterministic. No model is
+//!   called at any point. The safety gate is algorithmic, not probabilistic.
+//! - **Fail closed.** Every uncertain decision blocks. Unknown workflow →
+//!   blocked. Missing required input → blocked. Ambiguous reference → blocked.
+//! - **Path containment.** All file references are canonicalized and checked
+//!   against the host root. No traversal, no symlink escape, no encoded bypass.
+//! - **Input limits.** Packets are bounded (1 MB, 100 fields, 10K per field).
+//!   Config files are bounded (10 MB). The lexer rejects oversized input before
+//!   any heavy processing.
+//! - **Sanitized logging.** User values in logs are filtered to printable ASCII
+//!   with length caps. No log injection, no CSV injection.
+//! - **Append-only logs.** Every log write completes (flush + close) before
+//!   the next pipeline stage starts. No log loss on crash.
 //!
 //! # Modules
 //!
-//! The library is organized into the following modules, each corresponding to a
-//! pipeline stage or supporting infrastructure:
+//! The library is organized into modules corresponding to pipeline stages and
+//! supporting infrastructure:
 
 /// Typed AST types — `PgnPacket`, `FieldValue`, `PacketDirective`, and related
-/// data structures that represent a parsed Pidgin packet in memory.
+/// data structures representing a parsed Pidgin packet in memory.
 pub mod ast;
 
-/// Context planner — decides what information to retrieve given a packet's
+/// Context planner — decides what information to retrieve based on a packet's
 /// workflow and resolved references, producing a structured retrieval plan.
 pub mod context;
 
 /// Error types — `ParseError`, `ValidationError`, `SafetyError`, and other
-/// error enums with typed variants and formatted messages.
+/// error enums with typed variants, source chaining, and formatted messages.
 pub mod errors;
 
-/// Packet expander — takes a parsed, validated, safety-checked, and resolved
-/// packet and produces a fully-specified executable YAML packet (RunPacket,
-/// ResultPacket, ApprovalPacket, etc.).
+/// Packet expander — takes a validated, safety-checked, resolved packet and
+/// produces a fully-specified executable YAML packet ready for consumption by
+/// executors (RunPacket, ResultPacket, ApprovalPacket, ContextPacket).
 pub mod expander;
 
 /// Lexer/tokenizer — winnow-based tokenizer that converts raw `.pgn` text
-/// into tokens (headers, fields, scalars, lists, comments).
+/// into structured tokens: header, fields, scalars, lists, comments. Enforces
+/// input size limits (1 MB max, 100 fields max, 10,000 chars per field).
 pub mod lexer;
 
-/// Structured logging — append-only CSV logging for every pipeline stage
-/// (parse, validate, safety, resolve, expand, run) with sanitization.
+/// Structured logging — append-only CSV logging for every pipeline stage,
+/// with user-value sanitization (printable ASCII only, length-capped,
+/// newline-escaped) to prevent log injection and CSV injection.
 pub mod logging;
 
 /// Token estimation and cost metrics — estimates token cost of raw text and
-/// structured packets, and compares Pidgin format against verbose alternatives.
+/// structured packets using configurable models. Also supports comparing the
+/// same handoff expressed as Pidgin vs verbose natural language.
 pub mod metrics;
 
-/// Packet parser — winnow-based grammar parser that converts tokenized input
-/// into a typed `PgnPacket` AST, with size limits and input validation.
+/// Packet parser — winnow-based grammar parser that converts lexed tokens
+/// into a typed `PgnPacket` AST with full field validation, directive-specific
+/// required-field checks, and human-readable parse errors.
 pub mod parser;
 
-/// Registry loader — deserializes YAML configuration files (WorkflowRegistry,
-/// ActionRegistry, SafetyRules) from the host's `.pidgin/` directory.
+/// Registry loader — deserializes YAML configuration files from `.pidgin/`
+/// (WorkflowRegistry, ActionRegistry, SafetyRules, ReferenceAliases,
+/// PidginRuntimeConfig) with validation of structure and required keys.
 pub mod registry;
 
-/// Reference resolver — resolves short references (`namespace:id`, bare
-/// aliases) into real filesystem paths or IDs, with containment checks
-/// and symlink traversal protection.
+/// Reference resolver — maps short references (`namespace:id` and bare aliases)
+/// to real filesystem paths or identifiers, with canonicalization, host-root
+/// containment checks, and symlink-traversal protection.
 pub mod resolver;
 
-/// Route planner — recommends an executor for a packet based on the
-/// workflow's recommended and fallback executors and the safety result.
+/// Route planner — recommends an executor for a packet based on workflow
+/// configuration and safety results, with fallback chains and logging.
 pub mod router;
 
 /// Safety gate — enforces 9 safety rules (SG-1 through SG-9) including
-/// contradiction detection, human-gated actions, private path protection,
-/// and post-resolution safety checks.
+/// contradiction detection, human-approval requirements, private-path
+/// protection, workflow validation, mode validation, note isolation,
+/// required-ref checking, and critical-risk dual-packet approval.
 pub mod safety;
 
-/// Validator — syntax validation (structural completeness) and schema
-/// validation (registry-checked legality of values) for parsed packets.
+/// Validator — two-stage validation: syntax validation checks structural
+/// completeness (required fields present, types correct) and schema
+/// validation checks semantic legality (workflow in registry, mode allowed,
+/// risk level valid).
 pub mod validator;
 
 #[cfg(test)]
