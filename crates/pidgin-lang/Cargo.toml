@@ -1,6 +1,6 @@
 [package]
 name = "pidgin-lang"
-version = "0.1.4"
+version = "0.1.5"
 edition = "2024"
 description = "A compact agent handoff protocol runtime — parse, validate, resolve, and expand Pidgin packets"
 license = "MIT OR Apache-2.0"
@@ -12,7 +12,7 @@ keywords = ["pidgin", "agent", "handoff", "protocol", "llm"]
 categories = ["parser-implementations", "web-programming", "config"]
 
 [dependencies]
-clap = { version = "4.6.1", default-features = false, features = ["std", "derive"] }
+clap = { version = "4.6.1", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "=0.9.34"
 thiserror = "2.0.18"

@@ -158,6 +158,12 @@ enum Commands {
         #[arg(long)]
         force: bool,
     },
+
+    /// Print full documentation for agents (grammar, CLI, safety, integration)
+    Docs {
+        #[arg(long, default_value = "markdown")]
+        format: String,
+    },
 }
 
 const DEFAULT_RUNTIME_CONFIG: &str = r#"runtime:
@@ -314,6 +320,108 @@ block_if:
 
 const DEFAULT_REFERENCE_ALIASES: &str = r#"aliases: {}
 common: {}
+"#;
+
+const DOCS: &str = r#"# Pidgin — Agent Handoff Protocol & Runtime
+
+Pidgin is a compact, local-first protocol for structured handoffs between agents,
+between an agent and a human operator, and between an orchestrator and executors.
+
+## Architecture
+
+The pipeline is: parse → validate (syntax + schema) → safety gate → resolve references
+→ expand to executable packet → context plan → token estimate → route → log.
+
+Every stage is a pure function. The safety gate enforces 9 rules (SG-1 through SG-9).
+The resolver resolves short references (namespace:id or bare aliases) into real paths/IDs
+with containment and symlink traversal protection.
+
+## Packet Grammar
+
+A packet is a header line + key=value fields:
+
+  @run task.example
+  wf=generic_review
+  mode=draft
+  in=[primary_subject,source_refs]
+  out=[review_notes]
+  do=[draft,review]
+  deny=[publish,send,delete,secrets]
+  risk=med
+  human=yes
+
+Directives: @run, @result, @approval, @context
+Scalars: key=value
+Lists: key=[val1,val2]
+Quoted strings: key="value with spaces"
+Comments: # line comment (full line only)
+
+Reference syntax:
+  namespace:id     — e.g. file:src/main.rs, ep:UNIT012, workflow:generic_review
+  bare_alias       — resolved through REFERENCE_ALIASES.yaml
+
+## CLI Commands
+
+- init [--host PATH] [--force]     — Scaffold .pidgin/ config directory
+- parse FILE                       — Parse a packet, print AST
+- validate FILES... --host PATH    — Validate syntax + schema
+- check FILE --host PATH           — Parse → validate → safety → resolve
+- resolve FILE --host PATH         — Resolve all short references
+- expand FILE --host PATH [--out F] — Expand to executable YAML
+- context-plan FILE --host PATH    — Build context retrieval plan
+- measure FILE                     — Estimate token cost
+- compare --pgn F --verbose F      — Compare Pidgin vs verbose token cost
+- run FILE --host PATH [--out F]   — Full pipeline end-to-end
+- doctor --host PATH               — Check host configuration
+- docs [--format markdown]         — Print this documentation
+
+## Safety Rules
+
+SG-1: Action in both do and deny → blocked
+SG-2: Human-gated action without human=yes → blocked
+SG-3: High/critical risk forces human=yes, cannot override
+SG-4: References resolving to private paths → blocked
+SG-5: Unknown workflow → blocked
+SG-6: Invalid mode → blocked
+SG-7: Free-text note field is never parsed for instructions
+SG-8: Unresolved required inputs → expansion blocked
+SG-9: Critical risk requires an @approval packet
+
+Principle: Fail closed — if uncertain, block.
+
+## Configuration (.pidgin/)
+
+- PIDGIN_RUNTIME_CONFIG.yaml — runtime settings
+- WORKFLOW_REGISTRY.yaml     — workflow definitions
+- ACTION_REGISTRY.yaml       — action tiers (safe/controlled/human_gated)
+- SAFETY_RULES.yaml          — deny list, private paths, human rules
+- REFERENCE_ALIASES.yaml     — short-name aliases for references
+
+## Multi-Agent Integration
+
+  Agent A ──.pgn──→ Pidgin (validate→safety→resolve→expand) ──→ Agent B
+                                                                    │
+                                                               result .pgn
+                                                                    │
+  Agent A ←──────────────────── reads result ───────────────────────┘
+
+- LangGraph: Pidgin node between graph steps, expanded packets as state messages
+- CrewAI: Agent task outputs as .pgn, Pidgin validates handoffs
+- A2A: Expanded Run Packet as A2A Task payload
+- MCP: Pidgin as an MCP server exposing parse/validate/expand tools
+- Python SDK: pydantic-typed wrapper for Python orchestrators
+
+## Library Usage
+
+  use pidgin_lang::parser::parse_packet;
+  use pidgin_lang::safety::check_safety;
+  use pidgin_lang::expander::expand_to_run_packet;
+
+  let packet = parse_packet("@run my.task\nwf=generic_review\nmode=draft")
+      .expect("valid packet");
+
+Modules: parser, lexer, ast, validator::syntax, validator::schema, safety,
+resolver, expander, context, metrics, router, logging, registry, errors.
 "#;
 
 fn main() {
@@ -821,6 +929,20 @@ fn main() {
                 println!("initialized pidgin host config in {}", config_dir.display());
             } else {
                 println!("nothing to do (use --force to overwrite existing files)");
+            }
+        }
+
+        Commands::Docs { format } => {
+            match format.as_str() {
+                "markdown" => println!("{}", DOCS.trim()),
+                "json" => {
+                    // TODO: structured JSON output
+                    println!("{}", DOCS.trim());
+                }
+                other => {
+                    eprintln!("unsupported format '{}' (try \"markdown\")", other);
+                    std::process::exit(1);
+                }
             }
         }
     }
