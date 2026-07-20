@@ -40,12 +40,6 @@ pub struct SafetyResult {
     pub effective_risk: String,
 }
 
-#[derive(Debug, Clone)]
-pub struct BlockReason {
-    pub rule: SafetyRuleId,
-    pub message: String,
-}
-
 pub fn check_safety(
     packet: &PgnPacket,
     action_registry: &ActionRegistry,
@@ -96,11 +90,11 @@ pub fn check_safety(
     // SG-4: private path referenced (check unresolved reference strings for now)
     if let Some(FieldValue::List(references)) = packet.fields.get("in") {
         for reference in references {
-            for pattern in &safety_rules.private_paths {
-                if reference.contains(pattern) || reference_matches_pattern(reference, pattern) {
-                    fired_rules.push(SafetyRuleId::Sg4);
-                    break;
-                }
+            // Strip namespace prefix: "file:.env" → ".env"
+            let bare = reference.splitn(2, ':').last().unwrap_or(reference);
+            if matches_private_pattern(bare, &safety_rules.private_paths) {
+                fired_rules.push(SafetyRuleId::Sg4);
+                break;
             }
         }
     }
@@ -167,36 +161,48 @@ fn compute_effective_risk(packet: &PgnPacket, workflows: &WorkflowRegistry) -> S
     }
 }
 
-fn reference_matches_pattern(reference: &str, pattern: &str) -> bool {
-    // Simple glob-like matching for private path patterns
-    if let Some(suffix) = pattern.strip_prefix("**/") {
-        reference.contains(suffix)
-    } else if let Some(prefix) = pattern.strip_suffix(".*") {
-        reference.starts_with(prefix)
-    } else if pattern.starts_with('.') {
-        // Dot-prefixed patterns like .env, .env.*
-        reference == pattern || reference.starts_with(&format!("{}.", pattern))
-    } else {
-        reference == pattern
+/// Check if a string matches any private path pattern.
+/// Handles: exact match, `**/` prefix (contains), `*.ext` suffix, `.name` prefix.
+fn matches_private_pattern(value: &str, patterns: &[String]) -> bool {
+    for pattern in patterns {
+        if value == pattern {
+            return true;
+        }
+        if let Some(suffix) = pattern.strip_prefix("**/") {
+            // **/secrets/** → value contains "secrets/"
+            if value.contains(suffix) {
+                return true;
+            }
+        } else if let Some(ext) = pattern.strip_prefix("*.") {
+            // *.pem → value ends with ".pem"
+            if value.ends_with(&format!(".{}", ext)) {
+                return true;
+            }
+        } else if pattern.starts_with('.') {
+            // .env or .env.* → value == pattern or value starts with pattern + "."
+            if value == pattern || value.starts_with(&format!("{}.", pattern)) {
+                return true;
+            }
+        }
     }
+    false
 }
 
 /// Post-resolution safety check: compares canonical resolved paths against
-/// private path patterns. This catches cases where aliases or path traversal
-/// disguise a reference to a private path.
+/// private path patterns. Catches aliases or traversal that disguise a private ref.
 pub fn check_resolved_refs_safety(
     resolved: &[ResolvedRef],
     private_paths: &[String],
 ) -> Vec<SafetyRuleId> {
     let mut fired = Vec::new();
     for r in resolved {
-        let path_str = r.resolved_path.as_ref().map(|p| p.display().to_string());
-        let check_str = path_str.as_deref().unwrap_or(&r.ref_id);
-        for pattern in private_paths {
-            if check_str.contains(pattern) || reference_matches_pattern(check_str, pattern) {
-                fired.push(SafetyRuleId::Sg4);
-                break;
-            }
+        let check_str = r
+            .resolved_path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| r.ref_id.clone());
+        if matches_private_pattern(&check_str, private_paths) {
+            fired.push(SafetyRuleId::Sg4);
         }
     }
     fired

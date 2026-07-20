@@ -11,57 +11,39 @@ use pidgin_lang::registry::{load_action_registry, load_safety_rules, load_workfl
 use pidgin_lang::resolver::{load_aliases, resolve_all, ResolverContext};
 use pidgin_lang::router::{explain_route, route};
 use pidgin_lang::safety::{check_resolved_refs_safety, check_safety};
-use pidgin_lang::validator::syntax::validate_syntax;
 use pidgin_lang::validator::schema::validate_schema;
+use pidgin_lang::validator::syntax::validate_syntax;
 
 fn canonicalize_host(host: &Path) -> PathBuf {
     host.canonicalize().unwrap_or_else(|e| {
-        eprintln!("error: cannot canonicalize host path {}: {}", host.display(), e);
+        eprintln!(
+            "error: cannot canonicalize host path {}: {}",
+            host.display(),
+            e
+        );
         std::process::exit(1);
     })
 }
 
 fn load_pipeline_configs(host: &Path) -> PipelineConfig {
     let config_dir = host.join(".pidgin");
-    let workflow_path = config_dir.join("WORKFLOW_REGISTRY.yaml");
-    let action_path = config_dir.join("ACTION_REGISTRY.yaml");
-    let safety_path = config_dir.join("SAFETY_RULES.yaml");
-    let aliases_path = config_dir.join("REFERENCE_ALIASES.yaml");
-
-    let workflows = match load_workflow_registry(&workflow_path) {
-        Ok(w) => w,
-        Err(e) => {
-            eprintln!("Error loading workflow registry: {}", e);
-            std::process::exit(4);
-        }
-    };
-    let actions = match load_action_registry(&action_path) {
-        Ok(a) => a,
-        Err(e) => {
-            eprintln!("Error loading action registry: {}", e);
-            std::process::exit(4);
-        }
-    };
-    let safety_rules = match load_safety_rules(&safety_path) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("Error loading safety rules: {}", e);
-            std::process::exit(4);
-        }
-    };
-    let aliases = match load_aliases(&aliases_path) {
-        Ok(a) => a,
-        Err(e) => {
-            eprintln!("Error loading reference aliases: {}", e);
-            std::process::exit(4);
-        }
-    };
-
     PipelineConfig {
-        workflows,
-        actions,
-        safety_rules,
-        aliases,
+        workflows: load_or_exit(
+            load_workflow_registry(&config_dir.join("WORKFLOW_REGISTRY.yaml")),
+            "workflow registry",
+        ),
+        actions: load_or_exit(
+            load_action_registry(&config_dir.join("ACTION_REGISTRY.yaml")),
+            "action registry",
+        ),
+        safety_rules: load_or_exit(
+            load_safety_rules(&config_dir.join("SAFETY_RULES.yaml")),
+            "safety rules",
+        ),
+        aliases: load_or_exit(
+            load_aliases(&config_dir.join("REFERENCE_ALIASES.yaml")),
+            "reference aliases",
+        ),
     }
 }
 
@@ -73,7 +55,10 @@ struct PipelineConfig {
 }
 
 #[derive(Parser)]
-#[command(name = "pgn", about = "Pidgin — A compact agent handoff protocol runtime")]
+#[command(
+    name = "pgn",
+    about = "Pidgin — A compact agent handoff protocol runtime"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -82,9 +67,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Parse a Pidgin packet and print the AST
-    Parse {
-        file: PathBuf,
-    },
+    Parse { file: PathBuf },
 
     /// Validate a Pidgin packet (syntax + schema)
     Validate {
@@ -125,9 +108,7 @@ enum Commands {
     },
 
     /// Estimate token cost of a packet
-    Measure {
-        file: PathBuf,
-    },
+    Measure { file: PathBuf },
 
     /// Compare a pgn file against a verbose text version
     Compare {
@@ -160,10 +141,7 @@ enum Commands {
     },
 
     /// Print full documentation for agents (grammar, CLI, safety, integration)
-    Docs {
-        #[arg(long, default_value = "markdown")]
-        format: String,
-    },
+    Docs,
 }
 
 const DEFAULT_RUNTIME_CONFIG: &str = r#"runtime:
@@ -279,15 +257,7 @@ human_gated:
   - external_action
 "#;
 
-const DEFAULT_SAFETY_RULES: &str = r#"default_deny:
-  - publish
-  - send
-  - delete
-  - secrets
-  - credentials
-  - external_action
-
-private_paths:
+const DEFAULT_SAFETY_RULES: &str = r#"private_paths:
   - ".env"
   - ".env.*"
   - "*.key"
@@ -308,121 +278,36 @@ human_required:
   risk_levels:
     - high
     - crit
-
-block_if:
-  action_in_do_and_deny: true
-  private_path_referenced: true
-  unknown_workflow: true
-  invalid_mode: true
-  missing_required_field: true
-  dangerous_action_without_human: true
 "#;
 
 const DEFAULT_REFERENCE_ALIASES: &str = r#"aliases: {}
 common: {}
 "#;
 
-const DOCS: &str = r#"# Pidgin — Agent Handoff Protocol & Runtime
+fn load_or_exit<T>(result: Result<T, impl std::fmt::Display>, label: &str) -> T {
+    match result {
+        Ok(v) => v,
+        Err(e) => {
+            eprintln!("Error loading {}: {}", label, e);
+            std::process::exit(4);
+        }
+    }
+}
 
-Pidgin is a compact, local-first protocol for structured handoffs between agents,
-between an agent and a human operator, and between an orchestrator and executors.
-
-## Architecture
-
-The pipeline is: parse → validate (syntax + schema) → safety gate → resolve references
-→ expand to executable packet → context plan → token estimate → route → log.
-
-Every stage is a pure function. The safety gate enforces 9 rules (SG-1 through SG-9).
-The resolver resolves short references (namespace:id or bare aliases) into real paths/IDs
-with containment and symlink traversal protection.
-
-## Packet Grammar
-
-A packet is a header line + key=value fields:
-
-  @run task.example
-  wf=generic_review
-  mode=draft
-  in=[primary_subject,source_refs]
-  out=[review_notes]
-  do=[draft,review]
-  deny=[publish,send,delete,secrets]
-  risk=med
-  human=yes
-
-Directives: @run, @result, @approval, @context
-Scalars: key=value
-Lists: key=[val1,val2]
-Quoted strings: key="value with spaces"
-Comments: # line comment (full line only)
-
-Reference syntax:
-  namespace:id     — e.g. file:src/main.rs, ep:UNIT012, workflow:generic_review
-  bare_alias       — resolved through REFERENCE_ALIASES.yaml
-
-## CLI Commands
-
-- init [--host PATH] [--force]     — Scaffold .pidgin/ config directory
-- parse FILE                       — Parse a packet, print AST
-- validate FILES... --host PATH    — Validate syntax + schema
-- check FILE --host PATH           — Parse → validate → safety → resolve
-- resolve FILE --host PATH         — Resolve all short references
-- expand FILE --host PATH [--out F] — Expand to executable YAML
-- context-plan FILE --host PATH    — Build context retrieval plan
-- measure FILE                     — Estimate token cost
-- compare --pgn F --verbose F      — Compare Pidgin vs verbose token cost
-- run FILE --host PATH [--out F]   — Full pipeline end-to-end
-- doctor --host PATH               — Check host configuration
-- docs [--format markdown]         — Print this documentation
-
-## Safety Rules
-
-SG-1: Action in both do and deny → blocked
-SG-2: Human-gated action without human=yes → blocked
-SG-3: High/critical risk forces human=yes, cannot override
-SG-4: References resolving to private paths → blocked
-SG-5: Unknown workflow → blocked
-SG-6: Invalid mode → blocked
-SG-7: Free-text note field is never parsed for instructions
-SG-8: Unresolved required inputs → expansion blocked
-SG-9: Critical risk requires an @approval packet
-
-Principle: Fail closed — if uncertain, block.
-
-## Configuration (.pidgin/)
-
-- PIDGIN_RUNTIME_CONFIG.yaml — runtime settings
-- WORKFLOW_REGISTRY.yaml     — workflow definitions
-- ACTION_REGISTRY.yaml       — action tiers (safe/controlled/human_gated)
-- SAFETY_RULES.yaml          — deny list, private paths, human rules
-- REFERENCE_ALIASES.yaml     — short-name aliases for references
-
-## Multi-Agent Integration
-
-  Agent A ──.pgn──→ Pidgin (validate→safety→resolve→expand) ──→ Agent B
-                                                                    │
-                                                               result .pgn
-                                                                    │
-  Agent A ←──────────────────── reads result ───────────────────────┘
-
-- LangGraph: Pidgin node between graph steps, expanded packets as state messages
-- CrewAI: Agent task outputs as .pgn, Pidgin validates handoffs
-- A2A: Expanded Run Packet as A2A Task payload
-- MCP: Pidgin as an MCP server exposing parse/validate/expand tools
-- Python SDK: pydantic-typed wrapper for Python orchestrators
-
-## Library Usage
-
-  use pidgin_lang::parser::parse_packet;
-  use pidgin_lang::safety::check_safety;
-  use pidgin_lang::expander::expand_to_run_packet;
-
-  let packet = parse_packet("@run my.task\nwf=generic_review\nmode=draft")
-      .expect("valid packet");
-
-Modules: parser, lexer, ast, validator::syntax, validator::schema, safety,
-resolver, expander, context, metrics, router, logging, registry, errors.
-"#;
+fn get_required_inputs(
+    packet: &pidgin_lang::ast::PgnPacket,
+    workflows: &pidgin_lang::registry::WorkflowRegistry,
+) -> Vec<String> {
+    packet
+        .fields
+        .get("wf")
+        .and_then(|v| match v {
+            pidgin_lang::ast::FieldValue::Scalar(s) => workflows.workflows.get(s),
+            _ => None,
+        })
+        .map(|w| w.required_inputs.clone())
+        .unwrap_or_default()
+}
 
 fn main() {
     let cli = Cli::parse();
@@ -508,20 +393,13 @@ fn main() {
                 all_errors.push(format!("  [{}] {}", err.code, err.message));
             }
 
-            let safety_result = check_safety(&packet, &cfg.actions, &cfg.safety_rules, &cfg.workflows);
+            let safety_result =
+                check_safety(&packet, &cfg.actions, &cfg.safety_rules, &cfg.workflows);
             for rule in &safety_result.fired_rules {
                 all_errors.push(format!("  [{}] (safety)", rule));
             }
 
-            let required_inputs = packet
-                .fields
-                .get("wf")
-                .and_then(|v| match v {
-                    pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
-                    _ => None,
-                })
-                .map(|w| w.required_inputs.clone())
-                .unwrap_or_default();
+            let required_inputs = get_required_inputs(&packet, &cfg.workflows);
 
             let ctx = ResolverContext {
                 host_root,
@@ -529,12 +407,19 @@ fn main() {
                 required_inputs,
             };
             let resolved = resolve_all(&packet, &ctx);
-            let resolved_fired = check_resolved_refs_safety(&resolved, &cfg.safety_rules.private_paths);
+            let resolved_fired =
+                check_resolved_refs_safety(&resolved, &cfg.safety_rules.private_paths);
             for rule in &resolved_fired {
                 all_errors.push(format!("  [{}] (safety after resolution)", rule));
             }
             for r in &resolved {
-                if r.required && matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden) {
+                if r.required
+                    && matches!(
+                        r.status,
+                        pidgin_lang::resolver::ResolutionStatus::Unresolved
+                            | pidgin_lang::resolver::ResolutionStatus::Forbidden
+                    )
+                {
                     let label = match r.status {
                         pidgin_lang::resolver::ResolutionStatus::Unresolved => "UNRESOLVED",
                         pidgin_lang::resolver::ResolutionStatus::Forbidden => "FORBIDDEN",
@@ -574,15 +459,7 @@ fn main() {
                     std::process::exit(1);
                 }
             };
-            let required_inputs = packet
-                .fields
-                .get("wf")
-                .and_then(|v| match v {
-                    pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
-                    _ => None,
-                })
-                .map(|w| w.required_inputs.clone())
-                .unwrap_or_default();
+            let required_inputs = get_required_inputs(&packet, &cfg.workflows);
             let ctx = ResolverContext {
                 host_root,
                 aliases: cfg.aliases,
@@ -602,9 +479,22 @@ fn main() {
                     pidgin_lang::resolver::ResolutionStatus::Unresolved => "UNRESOLVED",
                     pidgin_lang::resolver::ResolutionStatus::Forbidden => "FORBIDDEN",
                 };
-                let path = r.resolved_path.as_ref().map(|p| p.display().to_string()).unwrap_or_else(|| "-".to_string());
-                println!("  {}  ns={}  id={}  confidence={:.1}  required={}  path={}", status, r.namespace, r.ref_id, r.confidence, r.required, path);
-                if r.required && matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden) {
+                let path = r
+                    .resolved_path
+                    .as_ref()
+                    .map(|p| p.display().to_string())
+                    .unwrap_or_else(|| "-".to_string());
+                println!(
+                    "  {}  ns={}  id={}  confidence={:.1}  required={}  path={}",
+                    status, r.namespace, r.ref_id, r.confidence, r.required, path
+                );
+                if r.required
+                    && matches!(
+                        r.status,
+                        pidgin_lang::resolver::ResolutionStatus::Unresolved
+                            | pidgin_lang::resolver::ResolutionStatus::Forbidden
+                    )
+                {
                     all_ok = false;
                 }
             }
@@ -663,7 +553,10 @@ fn main() {
             }
 
             let _ = log_event(
-                &host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"),
+                &host
+                    .join(".pidgin")
+                    .join("logs")
+                    .join("PIDGIN_RUNTIME_RUNS.csv"),
                 &LogEvent::Expand {
                     run_id: packet.run_id.clone(),
                     packet_type: "run".to_string(),
@@ -682,16 +575,12 @@ fn main() {
                 eprintln!("{}: Parse error: {}", file.display(), e);
                 std::process::exit(1);
             });
-            let required_inputs = packet
-                .fields
-                .get("wf")
-                .and_then(|v| match v {
-                    pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s),
-                    _ => None,
-                })
-                .map(|w| w.required_inputs.clone())
-                .unwrap_or_default();
-            let ctx = ResolverContext { host_root, aliases: cfg.aliases, required_inputs };
+            let required_inputs = get_required_inputs(&packet, &cfg.workflows);
+            let ctx = ResolverContext {
+                host_root,
+                aliases: cfg.aliases,
+                required_inputs,
+            };
             let resolved = resolve_all(&packet, &ctx);
             let plan = build_context_plan(&packet, &resolved);
             let yaml = serde_yaml::to_string(&plan).unwrap_or_else(|e| {
@@ -751,63 +640,159 @@ fn main() {
                 std::process::exit(1);
             });
             let packet = match parse_packet(&content) {
-                Ok(p) => { run_id = p.run_id.clone(); p }
+                Ok(p) => {
+                    run_id = p.run_id.clone();
+                    p
+                }
                 Err(e) => {
                     eprintln!("{}: Parse error: {}", file.display(), e);
-                    let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Parse { run_id: file.display().to_string(), ok: false });
+                    let _ = log_event(
+                        &host
+                            .join(".pidgin")
+                            .join("logs")
+                            .join("PIDGIN_RUNTIME_RUNS.csv"),
+                        &LogEvent::Parse {
+                            run_id: file.display().to_string(),
+                            ok: false,
+                        },
+                    );
                     std::process::exit(1);
                 }
             };
-            let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Parse { run_id: run_id.clone(), ok: true });
+            let _ = log_event(
+                &host
+                    .join(".pidgin")
+                    .join("logs")
+                    .join("PIDGIN_RUNTIME_RUNS.csv"),
+                &LogEvent::Parse {
+                    run_id: run_id.clone(),
+                    ok: true,
+                },
+            );
 
             // Validate
             let syntax_errors = validate_syntax(&packet);
             let schema_errors = validate_schema(&packet, &cfg.workflows);
             if !syntax_errors.is_empty() || !schema_errors.is_empty() {
                 eprintln!("{}: Validation errors", file.display());
-                for err in &syntax_errors { eprintln!("  [{}] {}", err.code, err.message); }
-                for err in &schema_errors { eprintln!("  [{}] {}", err.code, err.message); }
-                let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Validate { run_id: run_id.clone(), ok: false });
+                for err in &syntax_errors {
+                    eprintln!("  [{}] {}", err.code, err.message);
+                }
+                for err in &schema_errors {
+                    eprintln!("  [{}] {}", err.code, err.message);
+                }
+                let _ = log_event(
+                    &host
+                        .join(".pidgin")
+                        .join("logs")
+                        .join("PIDGIN_RUNTIME_RUNS.csv"),
+                    &LogEvent::Validate {
+                        run_id: run_id.clone(),
+                        ok: false,
+                    },
+                );
                 std::process::exit(1);
             }
-            let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Validate { run_id: run_id.clone(), ok: true });
+            let _ = log_event(
+                &host
+                    .join(".pidgin")
+                    .join("logs")
+                    .join("PIDGIN_RUNTIME_RUNS.csv"),
+                &LogEvent::Validate {
+                    run_id: run_id.clone(),
+                    ok: true,
+                },
+            );
 
             // Safety
             let safety = check_safety(&packet, &cfg.actions, &cfg.safety_rules, &cfg.workflows);
-            let rules_str = safety.fired_rules.iter().map(|r| r.to_string()).collect::<Vec<_>>().join(",");
-            let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::SafetyGate { run_id: run_id.clone(), blocked: safety.blocked, rules: rules_str });
+            let rules_str = safety
+                .fired_rules
+                .iter()
+                .map(|r| r.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            let _ = log_event(
+                &host
+                    .join(".pidgin")
+                    .join("logs")
+                    .join("PIDGIN_RUNTIME_RUNS.csv"),
+                &LogEvent::SafetyGate {
+                    run_id: run_id.clone(),
+                    blocked: safety.blocked,
+                    rules: rules_str,
+                },
+            );
             if safety.blocked {
                 eprintln!("{}: Blocked by safety", file.display());
-                for rule in &safety.fired_rules { eprintln!("  [{}]", rule); }
-                std::process::exit(2);
-            }
-
-            // Resolve
-            let required_inputs = packet
-                .fields.get("wf")
-                .and_then(|v| match v { pidgin_lang::ast::FieldValue::Scalar(s) => cfg.workflows.workflows.get(s), _ => None })
-                .map(|w| w.required_inputs.clone())
-                .unwrap_or_default();
-            let ctx = ResolverContext { host_root, aliases: cfg.aliases, required_inputs };
-            let resolved = resolve_all(&packet, &ctx);
-
-            // Post-resolution private path check
-            let resolved_fired = check_resolved_refs_safety(&resolved, &cfg.safety_rules.private_paths);
-            if !resolved_fired.is_empty() {
-                for rule in &resolved_fired {
-                    eprintln!("{}: Blocked by safety after resolution: {}", file.display(), rule);
+                for rule in &safety.fired_rules {
+                    eprintln!("  [{}]", rule);
                 }
                 std::process::exit(2);
             }
 
-            let unresolved = resolved.iter().filter(|r| matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden)).count();
-            let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Resolve { run_id: run_id.clone(), refs_total: resolved.len(), refs_unresolved: unresolved });
+            // Resolve
+            let required_inputs = get_required_inputs(&packet, &cfg.workflows);
+            let ctx = ResolverContext {
+                host_root,
+                aliases: cfg.aliases,
+                required_inputs,
+            };
+            let resolved = resolve_all(&packet, &ctx);
+
+            // Post-resolution private path check
+            let resolved_fired =
+                check_resolved_refs_safety(&resolved, &cfg.safety_rules.private_paths);
+            if !resolved_fired.is_empty() {
+                for rule in &resolved_fired {
+                    eprintln!(
+                        "{}: Blocked by safety after resolution: {}",
+                        file.display(),
+                        rule
+                    );
+                }
+                std::process::exit(2);
+            }
+
+            let unresolved = resolved
+                .iter()
+                .filter(|r| {
+                    matches!(
+                        r.status,
+                        pidgin_lang::resolver::ResolutionStatus::Unresolved
+                            | pidgin_lang::resolver::ResolutionStatus::Forbidden
+                    )
+                })
+                .count();
+            let _ = log_event(
+                &host
+                    .join(".pidgin")
+                    .join("logs")
+                    .join("PIDGIN_RUNTIME_RUNS.csv"),
+                &LogEvent::Resolve {
+                    run_id: run_id.clone(),
+                    refs_total: resolved.len(),
+                    refs_unresolved: unresolved,
+                },
+            );
             for r in &resolved {
-                if r.required && matches!(r.status, pidgin_lang::resolver::ResolutionStatus::Unresolved | pidgin_lang::resolver::ResolutionStatus::Forbidden) {
-                    eprintln!("{}: Required reference {}: {}", file.display(), match r.status {
-                        pidgin_lang::resolver::ResolutionStatus::Forbidden => "forbidden (path traversal blocked)",
-                        _ => "unresolved",
-                    }, r.original);
+                if r.required
+                    && matches!(
+                        r.status,
+                        pidgin_lang::resolver::ResolutionStatus::Unresolved
+                            | pidgin_lang::resolver::ResolutionStatus::Forbidden
+                    )
+                {
+                    eprintln!(
+                        "{}: Required reference {}: {}",
+                        file.display(),
+                        match r.status {
+                            pidgin_lang::resolver::ResolutionStatus::Forbidden =>
+                                "forbidden (path traversal blocked)",
+                            _ => "unresolved",
+                        },
+                        r.original
+                    );
                     std::process::exit(3);
                 }
             }
@@ -821,7 +806,16 @@ fn main() {
                 eprintln!("Error serializing: {}", e);
                 std::process::exit(5);
             });
-            let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Expand { run_id: run_id.clone(), packet_type: "run".to_string() });
+            let _ = log_event(
+                &host
+                    .join(".pidgin")
+                    .join("logs")
+                    .join("PIDGIN_RUNTIME_RUNS.csv"),
+                &LogEvent::Expand {
+                    run_id: run_id.clone(),
+                    packet_type: "run".to_string(),
+                },
+            );
 
             match out {
                 Some(path) => {
@@ -829,7 +823,11 @@ fn main() {
                         eprintln!("Error writing output: {}", e);
                         std::process::exit(5);
                     });
-                    println!("{}: expanded -> {} (dry-run)", file.display(), path.display());
+                    println!(
+                        "{}: expanded -> {} (dry-run)",
+                        file.display(),
+                        path.display()
+                    );
                 }
                 None => {
                     println!("---");
@@ -839,16 +837,34 @@ fn main() {
                 }
             }
 
-            let _ = log_event(&host.join(".pidgin").join("logs").join("PIDGIN_RUNTIME_RUNS.csv"), &LogEvent::Run { run_id: run_id.clone(), status: "dry_run_ok".to_string() });
+            let _ = log_event(
+                &host
+                    .join(".pidgin")
+                    .join("logs")
+                    .join("PIDGIN_RUNTIME_RUNS.csv"),
+                &LogEvent::Run {
+                    run_id: run_id.clone(),
+                    status: "dry_run_ok".to_string(),
+                },
+            );
         }
 
         Commands::Doctor { host } => {
             let config_dir = host.join(".pidgin");
             let checks = vec![
-                ("WORKFLOW_REGISTRY.yaml", config_dir.join("WORKFLOW_REGISTRY.yaml")),
-                ("ACTION_REGISTRY.yaml", config_dir.join("ACTION_REGISTRY.yaml")),
+                (
+                    "WORKFLOW_REGISTRY.yaml",
+                    config_dir.join("WORKFLOW_REGISTRY.yaml"),
+                ),
+                (
+                    "ACTION_REGISTRY.yaml",
+                    config_dir.join("ACTION_REGISTRY.yaml"),
+                ),
                 ("SAFETY_RULES.yaml", config_dir.join("SAFETY_RULES.yaml")),
-                ("REFERENCE_ALIASES.yaml", config_dir.join("REFERENCE_ALIASES.yaml")),
+                (
+                    "REFERENCE_ALIASES.yaml",
+                    config_dir.join("REFERENCE_ALIASES.yaml"),
+                ),
             ];
 
             let mut all_ok = true;
@@ -893,7 +909,10 @@ fn main() {
             let logs_dir = config_dir.join("logs");
 
             if config_dir.exists() && !force {
-                eprintln!("{} already exists (use --force to overwrite)", config_dir.display());
+                eprintln!(
+                    "{} already exists (use --force to overwrite)",
+                    config_dir.display()
+                );
                 std::process::exit(1);
             }
 
@@ -903,11 +922,23 @@ fn main() {
             });
 
             let files: Vec<(&str, &Path, &str)> = vec![
-                ("PIDGIN_RUNTIME_CONFIG.yaml", &config_dir, DEFAULT_RUNTIME_CONFIG),
-                ("WORKFLOW_REGISTRY.yaml", &config_dir, DEFAULT_WORKFLOW_REGISTRY),
+                (
+                    "PIDGIN_RUNTIME_CONFIG.yaml",
+                    &config_dir,
+                    DEFAULT_RUNTIME_CONFIG,
+                ),
+                (
+                    "WORKFLOW_REGISTRY.yaml",
+                    &config_dir,
+                    DEFAULT_WORKFLOW_REGISTRY,
+                ),
                 ("ACTION_REGISTRY.yaml", &config_dir, DEFAULT_ACTION_REGISTRY),
                 ("SAFETY_RULES.yaml", &config_dir, DEFAULT_SAFETY_RULES),
-                ("REFERENCE_ALIASES.yaml", &config_dir, DEFAULT_REFERENCE_ALIASES),
+                (
+                    "REFERENCE_ALIASES.yaml",
+                    &config_dir,
+                    DEFAULT_REFERENCE_ALIASES,
+                ),
             ];
 
             let mut count = 0;
@@ -932,15 +963,18 @@ fn main() {
             }
         }
 
-        Commands::Docs { format } => {
-            match format.as_str() {
-                "markdown" => println!("{}", DOCS.trim()),
-                "json" => {
-                    // TODO: structured JSON output
-                    println!("{}", DOCS.trim());
-                }
-                other => {
-                    eprintln!("unsupported format '{}' (try \"markdown\")", other);
+        Commands::Docs => {
+            let spec_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("docs")
+                .join("SPEC.md");
+            match fs::read_to_string(&spec_path) {
+                Ok(content) => println!("{}", content),
+                Err(_) => {
+                    eprintln!("docs/SPEC.md not found in repository");
                     std::process::exit(1);
                 }
             }

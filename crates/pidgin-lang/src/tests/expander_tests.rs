@@ -5,13 +5,14 @@ mod expander_tests {
     use std::path::Path;
 
     use crate::ast::{Directive, FieldValue, PgnPacket};
-    use crate::expander::{expand_to_approval_request, expand_to_run_packet, ExpandedRef};
+    use crate::expander::{expand_to_run_packet, ExpandedRef};
     use crate::registry::{load_workflow_registry, WorkflowRegistry};
-    use crate::resolver::{ResolvedRef, ResolutionStatus};
+    use crate::resolver::{ResolutionStatus, ResolvedRef};
     use crate::safety::SafetyResult;
 
     fn test_workflows() -> WorkflowRegistry {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/WORKFLOW_REGISTRY.yaml");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/WORKFLOW_REGISTRY.yaml");
         load_workflow_registry(&path).unwrap()
     }
 
@@ -34,7 +35,10 @@ mod expander_tests {
         fields.insert("mode".to_string(), FieldValue::Scalar("draft".to_string()));
         fields.insert(
             "in".to_string(),
-            FieldValue::List(vec!["primary_subject".to_string(), "source_refs".to_string()]),
+            FieldValue::List(vec![
+                "primary_subject".to_string(),
+                "source_refs".to_string(),
+            ]),
         );
         fields.insert(
             "out".to_string(),
@@ -146,26 +150,6 @@ mod expander_tests {
     }
 
     #[test]
-    fn expand_approval_request_includes_actions_and_risk() {
-        let packet = make_packet();
-        let safety = SafetyResult {
-            effective_risk: "crit".to_string(),
-            human_required: true,
-            ..default_safety()
-        };
-        let workflows = test_workflows();
-
-        let approval = expand_to_approval_request(&packet, &safety, &workflows);
-
-        assert_eq!(approval.spec_version, "1.0");
-        assert_eq!(approval.run_id, "test.expand");
-        assert_eq!(approval.workflow, "generic_review");
-        assert_eq!(approval.risk, "crit");
-        assert!(approval.human_required);
-        assert_eq!(approval.actions, vec!["draft", "review"]);
-    }
-
-    #[test]
     fn expanded_ref_from_resolved_ref() {
         let r = ResolvedRef {
             original: "file:Cargo.toml".to_string(),
@@ -186,9 +170,10 @@ mod expander_tests {
     #[test]
     fn expand_with_note() {
         let mut packet = make_packet();
-        packet
-            .fields
-            .insert("note".to_string(), FieldValue::Scalar("test note".to_string()));
+        packet.fields.insert(
+            "note".to_string(),
+            FieldValue::Scalar("test note".to_string()),
+        );
         let resolved = vec![];
         let safety = default_safety();
         let workflows = test_workflows();

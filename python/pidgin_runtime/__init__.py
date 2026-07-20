@@ -53,14 +53,16 @@ class PidginClient:
         for line in lines:
             parts = line.strip().split()
             if len(parts) >= 6:
-                results.append({
-                    "status": parts[0],
-                    "ns": parts[1].split("=")[1],
-                    "id": parts[2].split("=")[1],
-                    "confidence": float(parts[3].split("=")[1]),
-                    "required": parts[4].split("=")[1] == "true",
-                    "path": parts[5].split("=")[1] if len(parts) > 5 else "",
-                })
+                results.append(
+                    {
+                        "status": parts[0],
+                        "ns": parts[1].split("=")[1],
+                        "id": parts[2].split("=")[1],
+                        "confidence": float(parts[3].split("=")[1]),
+                        "required": parts[4].split("=")[1] == "true",
+                        "path": parts[5].split("=")[1] if len(parts) > 5 else "",
+                    }
+                )
         return results
 
     @staticmethod
@@ -75,6 +77,7 @@ class PidginClient:
     @staticmethod
     def _parse_yaml_lines(output: str) -> dict[str, Any]:
         import yaml
+
         return yaml.safe_load(output)
 
 
@@ -92,7 +95,7 @@ def main() -> None:
         if idx + 1 < len(sys.argv):
             host = Path(sys.argv[idx + 1])
 
-    client = PidginClient("target/debug/pidgin-cli")
+    client = PidginClient("pgn")
 
     if command == "parse":
         result = client.parse(file)

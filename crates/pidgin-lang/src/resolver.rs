@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use crate::ast::{FieldValue, PgnPacket};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ResolutionStatus {
     Resolved,
     Missing,
@@ -119,8 +119,8 @@ pub fn resolve_ref(reference: &str, ctx: &ResolverContext) -> ResolvedRef {
     };
 
     match namespace.as_str() {
-        "file" => resolve_file_ref(&original, &ref_id, &ctx.host_root, required),
-        "folder" => resolve_folder_ref(&original, &ref_id, &ctx.host_root, required),
+        "file" => resolve_path_ref(&original, &ref_id, &ctx.host_root, required, "file", |p| p.exists()),
+        "folder" => resolve_path_ref(&original, &ref_id, &ctx.host_root, required, "folder", |p| p.is_dir()),
         _ => ResolvedRef {
             original,
             namespace,
@@ -220,18 +220,20 @@ fn is_path_within_root(candidate: &Path, root: &Path) -> bool {
     true
 }
 
-fn resolve_file_ref(
+fn resolve_path_ref(
     original: &str,
     ref_id: &str,
     host_root: &Path,
     required: bool,
+    namespace: &str,
+    exists_fn: fn(&Path) -> bool,
 ) -> ResolvedRef {
     let canonical_root = match host_root.canonicalize() {
         Ok(r) => r,
         Err(_) => {
             return ResolvedRef {
                 original: original.to_string(),
-                namespace: "file".to_string(),
+                namespace: namespace.to_string(),
                 ref_id: ref_id.to_string(),
                 resolved_path: None,
                 confidence: 0.0,
@@ -245,7 +247,7 @@ fn resolve_file_ref(
     if !is_path_within_root(&resolved_path, &canonical_root) {
         return ResolvedRef {
             original: original.to_string(),
-            namespace: "file".to_string(),
+            namespace: namespace.to_string(),
             ref_id: ref_id.to_string(),
             resolved_path: None,
             confidence: 0.0,
@@ -254,7 +256,7 @@ fn resolve_file_ref(
         };
     }
 
-    let (status, confidence) = if resolved_path.exists() {
+    let (status, confidence) = if exists_fn(&resolved_path) {
         (ResolutionStatus::Resolved, 1.0)
     } else {
         (ResolutionStatus::Missing, 0.0)
@@ -262,58 +264,7 @@ fn resolve_file_ref(
 
     ResolvedRef {
         original: original.to_string(),
-        namespace: "file".to_string(),
-        ref_id: ref_id.to_string(),
-        resolved_path: Some(resolved_path),
-        confidence,
-        required,
-        status,
-    }
-}
-
-fn resolve_folder_ref(
-    original: &str,
-    ref_id: &str,
-    host_root: &Path,
-    required: bool,
-) -> ResolvedRef {
-    let canonical_root = match host_root.canonicalize() {
-        Ok(r) => r,
-        Err(_) => {
-            return ResolvedRef {
-                original: original.to_string(),
-                namespace: "folder".to_string(),
-                ref_id: ref_id.to_string(),
-                resolved_path: None,
-                confidence: 0.0,
-                required,
-                status: ResolutionStatus::Forbidden,
-            };
-        }
-    };
-    let resolved_path = canonical_root.join(ref_id);
-
-    if !is_path_within_root(&resolved_path, &canonical_root) {
-        return ResolvedRef {
-            original: original.to_string(),
-            namespace: "folder".to_string(),
-            ref_id: ref_id.to_string(),
-            resolved_path: None,
-            confidence: 0.0,
-            required,
-            status: ResolutionStatus::Forbidden,
-        };
-    }
-
-    let (status, confidence) = if resolved_path.is_dir() {
-        (ResolutionStatus::Resolved, 1.0)
-    } else {
-        (ResolutionStatus::Missing, 0.0)
-    };
-
-    ResolvedRef {
-        original: original.to_string(),
-        namespace: "folder".to_string(),
+        namespace: namespace.to_string(),
         ref_id: ref_id.to_string(),
         resolved_path: Some(resolved_path),
         confidence,

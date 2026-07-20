@@ -35,21 +35,9 @@ pub struct HumanRequired {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct BlockIf {
-    pub action_in_do_and_deny: bool,
-    pub private_path_referenced: bool,
-    pub unknown_workflow: bool,
-    pub invalid_mode: bool,
-    pub missing_required_field: bool,
-    pub dangerous_action_without_human: bool,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct SafetyRules {
-    pub default_deny: Vec<String>,
     pub private_paths: Vec<String>,
     pub human_required: HumanRequired,
-    pub block_if: BlockIf,
 }
 
 #[derive(Debug, thiserror::Error)]
