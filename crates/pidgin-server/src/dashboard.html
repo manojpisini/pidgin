@@ -3,395 +3,434 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pidgin — Agent Handoff Protocol</title>
+<title>pidgin // agent protocol simulator</title>
 <style>
+  :root { --bg: #06080a; --panel: #0c0f12; --border: #151a1f; --accent: #22d3ee; --green: #34d399; --red: #f87171; --yellow: #fbbf24; --purple: #a78bfa; --blue: #60a5fa; --dim: #374151; --text: #9ca3af; --bright: #e5e7eb; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #d4d4d4; line-height: 1.6; }
-  a { color: #60a5fa; text-decoration: none; }
-  a:hover { text-decoration: underline; }
+  body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
 
-  /* Nav */
-  nav { position: sticky; top: 0; z-index: 100; padding: 16px 32px; background: rgba(10,10,10,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; justify-content: space-between; }
-  nav .brand { display: flex; align-items: center; gap: 12px; }
-  nav .brand h1 { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
-  nav .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-  nav .links { display: flex; gap: 24px; font-size: 13px; }
-  nav .links a { color: #888; transition: color 0.15s; }
-  nav .links a:hover { color: #fff; text-decoration: none; }
-  nav .version { background: #1a1a2a; color: #60a5fa; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+  /* Grid layout */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; gap: 1px; background: var(--border); min-height: 100vh; }
+  .grid > * { background: var(--bg); }
+  .header { grid-column: 1 / -1; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
+  .header .left { display: flex; align-items: center; gap: 12px; }
+  .header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
+  .header h1 { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; }
+  .header .right { font-size: 11px; color: var(--dim); display: flex; gap: 16px; }
+  .header .right span { color: var(--text); }
 
-  /* Hero */
-  .hero { padding: 80px 32px 60px; text-align: center; max-width: 720px; margin: 0 auto; }
-  .hero h2 { font-size: 42px; font-weight: 700; color: #fff; letter-spacing: -1px; margin-bottom: 16px; }
-  .hero p { font-size: 17px; color: #888; max-width: 540px; margin: 0 auto 32px; }
-  .hero .packets { display: inline-flex; gap: 8px; background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 12px 20px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; color: #666; margin-bottom: 32px; }
-  .hero .packets span { color: #4ade80; }
-  .hero .cta { display: flex; gap: 12px; justify-content: center; }
-  .hero .cta a { padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; transition: all 0.15s; }
-  .cta .primary { background: #2563eb; color: #fff; }
-  .cta .primary:hover { background: #1d4ed8; text-decoration: none; }
-  .cta .secondary { background: #1a1a1a; color: #ccc; border: 1px solid #333; }
-  .cta .secondary:hover { background: #222; text-decoration: none; }
+  /* Panels */
+  .panel { padding: 12px; overflow: hidden; display: flex; flex-direction: column; }
+  .panel-title { font-size: 10px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .panel-title::before { content: ''; width: 4px; height: 4px; border-radius: 1px; }
+  .panel-title.cyan::before { background: var(--accent); }
+  .panel-title.green::before { background: var(--green); }
+  .panel-title.purple::before { background: var(--purple); }
+  .panel-title.yellow::before { background: var(--yellow); }
+  .panel-title.red::before { background: var(--red); }
 
-  /* Sections */
-  .section { max-width: 960px; margin: 0 auto; padding: 60px 32px; }
-  .section-label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-  .section-title { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 12px; }
-  .section-desc { font-size: 15px; color: #777; max-width: 560px; margin-bottom: 40px; }
+  /* Pipeline Visualizer */
+  .pipeline-vis { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+  .stage-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; transition: all 0.3s; position: relative; }
+  .stage-row.active { border-color: var(--accent); background: rgba(34,211,238,0.05); }
+  .stage-row.done { border-color: var(--green); background: rgba(52,211,153,0.05); }
+  .stage-row.fail { border-color: var(--red); background: rgba(248,113,113,0.05); }
+  .stage-row .idx { color: var(--dim); width: 20px; text-align: right; }
+  .stage-row .name { color: var(--bright); width: 90px; }
+  .stage-row .status { margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 3px; }
+  .status.pending { background: #1a1a2a; color: var(--dim); }
+  .status.running { background: #1a2a2a; color: var(--accent); animation: pulse 1s infinite; }
+  .status.pass { background: #1a2a1a; color: var(--green); }
+  .status.fail { background: #2a1a1a; color: var(--red); }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
+  .stage-row .bar { position: absolute; bottom: 0; left: 0; height: 2px; background: var(--accent); border-radius: 0 0 4px 4px; transition: width 0.3s; }
 
-  /* Pipeline */
-  .pipeline { display: flex; align-items: center; gap: 0; overflow-x: auto; padding: 20px 0; }
-  .pipeline .stage { flex-shrink: 0; background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 16px 20px; text-align: center; min-width: 120px; transition: border-color 0.2s; }
-  .pipeline .stage:hover { border-color: #333; }
-  .pipeline .stage .name { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 4px; }
-  .pipeline .stage .desc { font-size: 11px; color: #666; }
-  .pipeline .arrow { flex-shrink: 0; color: #333; font-size: 18px; padding: 0 4px; }
+  /* Agent Network */
+  .network-canvas { flex: 1; position: relative; }
+  .network-canvas canvas { width: 100%; height: 100%; }
 
-  /* Feature Grid */
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-  .card { background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 24px; transition: border-color 0.2s; }
-  .card:hover { border-color: #333; }
-  .card .icon { font-size: 24px; margin-bottom: 12px; }
-  .card h3 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 8px; }
-  .card p { font-size: 13px; color: #777; line-height: 1.5; }
+  /* Event Log */
+  .log { flex: 1; overflow-y: auto; font-size: 11px; line-height: 1.6; }
+  .log-entry { display: flex; gap: 8px; padding: 2px 0; }
+  .log-entry .ts { color: var(--dim); flex-shrink: 0; }
+  .log-entry .ev { color: var(--text); }
+  .log-entry .ev .tag { padding: 1px 5px; border-radius: 2px; font-size: 10px; margin-right: 4px; }
+  .tag.parse { background: #1a1a2a; color: var(--blue); }
+  .tag.safety { background: #1a2a1a; color: var(--green); }
+  .tag.resolve { background: #2a1a2a; color: var(--purple); }
+  .tag.expand { background: #2a2a1a; color: var(--yellow); }
+  .tag.route { background: #1a2a2a; color: var(--accent); }
+  .tag.error { background: #2a1a1a; color: var(--red); }
+  .tag.agent { background: #1a1a2a; color: var(--blue); }
+  .tag.handoff { background: #2a1a2a; color: var(--accent); }
 
-  /* Agents */
-  .agents { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
-  .agent { background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 20px; display: flex; align-items: center; gap: 14px; transition: border-color 0.2s; }
-  .agent:hover { border-color: #333; }
-  .agent .avatar { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; }
-  .agent .info h4 { font-size: 14px; font-weight: 600; color: #fff; }
-  .agent .info p { font-size: 12px; color: #666; }
+  /* Packet Inspector */
+  .inspector { display: flex; gap: 1px; background: var(--border); border-radius: 4px; overflow: hidden; flex: 1; }
+  .inspector .col { flex: 1; background: var(--panel); padding: 10px; overflow: auto; }
+  .inspector .col-title { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .inspector pre { font-size: 11px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-all; }
+  .inspector pre .kw { color: var(--accent); }
+  .inspector pre .val { color: var(--green); }
+  .inspector pre .field { color: var(--blue); }
 
-  /* Safety */
-  .rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
-  .rule { background: #111; border: 1px solid #1a1a1a; border-radius: 8px; padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px; }
-  .rule .tag { background: #1a2a1a; color: #4ade80; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: monospace; flex-shrink: 0; margin-top: 2px; }
-  .rule .text { font-size: 13px; color: #aaa; }
+  /* Controls */
+  .controls { grid-column: 1 / -1; padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .controls textarea { flex: 1; height: 60px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--bright); font-family: inherit; font-size: 11px; padding: 8px; resize: none; outline: none; }
+  .controls textarea:focus { border-color: var(--accent); }
+  .controls .btns { display: flex; flex-direction: column; gap: 4px; }
+  .controls button { padding: 6px 14px; border: none; border-radius: 3px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+  .btn-sim { background: var(--accent); color: #000; }
+  .btn-sim:hover { background: #06b6d4; }
+  .btn-rst { background: var(--border); color: var(--dim); }
+  .btn-rst:hover { background: #1a1a1a; color: var(--text); }
+  .btn-ex { background: transparent; color: var(--dim); border: 1px solid var(--border); font-size: 10px; }
+  .btn-ex:hover { border-color: var(--accent); color: var(--accent); }
 
-  /* Grammar */
-  .grammar { background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 24px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.8; overflow-x: auto; }
-  .grammar .kw { color: #c084fc; }
-  .grammar .field { color: #60a5fa; }
-  .grammar .val { color: #4ade80; }
-  .grammar .comment { color: #555; }
+  /* Handoff Vis */
+  .handoff-vis { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; position: relative; }
+  .agent-node { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; transition: all 0.4s; position: relative; }
+  .agent-node.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(34,211,238,0.2); }
+  .agent-node .icon { font-size: 20px; margin-bottom: 2px; }
+  .agent-node .label { color: var(--dim); font-size: 9px; }
+  .pidgin-node { width: 60px; height: 60px; border-radius: 12px; border: 2px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; transition: all 0.4s; }
+  .pidgin-node.active { border-color: var(--green); box-shadow: 0 0 20px rgba(52,211,153,0.2); }
+  .pidgin-node .icon { font-size: 16px; }
+  .arrow-line { position: absolute; height: 2px; background: var(--border); transition: background 0.3s; }
+  .arrow-line.active { background: var(--accent); box-shadow: 0 0 8px rgba(34,211,238,0.4); }
+  .packet-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); position: absolute; opacity: 0; transition: all 0.6s ease-in-out; }
+  .packet-dot.show { opacity: 1; }
+  .handoff-label { font-size: 9px; color: var(--dim); position: absolute; }
 
-  /* API Explorer */
-  .explorer { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  @media (max-width: 768px) { .explorer { grid-template-columns: 1fr; } }
-  .explorer textarea { width: 100%; height: 320px; background: #111; border: 1px solid #1a1a1a; border-radius: 8px; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; padding: 16px; resize: vertical; outline: none; }
-  .explorer textarea:focus { border-color: #333; }
-  .explorer .result-panel { background: #111; border: 1px solid #1a1a1a; border-radius: 8px; padding: 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; overflow-y: auto; max-height: 356px; color: #aaa; }
-  .explorer .btn-row { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
-  .explorer button { padding: 8px 16px; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-  .btn-run { background: #2563eb; color: #fff; }
-  .btn-run:hover { background: #1d4ed8; }
-  .btn-sec { background: #1a1a1a; color: #999; border: 1px solid #2a2a2a; }
-  .btn-sec:hover { background: #222; color: #ccc; }
-  .timing { font-size: 11px; color: #555; margin-top: 8px; }
-
-  /* CLI */
-  .cli-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
-  .cli-item { background: #111; border: 1px solid #1a1a1a; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
-  .cli-item code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; color: #4ade80; flex-shrink: 0; }
-  .cli-item span { font-size: 12px; color: #666; }
-
-  /* Footer */
-  footer { border-top: 1px solid #1a1a1a; padding: 32px; text-align: center; font-size: 12px; color: #444; margin-top: 40px; }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 </style>
 </head>
 <body>
 
-<nav>
-  <div class="brand">
-    <div class="dot"></div>
-    <h1>pidgin</h1>
-  </div>
-  <div class="links">
-    <a href="#pipeline">Pipeline</a>
-    <a href="#features">Features</a>
-    <a href="#agents">Agents</a>
-    <a href="#safety">Safety</a>
-    <a href="#grammar">Grammar</a>
-    <a href="#explorer">Explorer</a>
-    <a href="#cli">CLI</a>
-  </div>
-  <span class="version" id="version">v...</span>
-</nav>
-
-<!-- Hero -->
-<div class="hero">
-  <div class="packets"><span>@run</span> agent.handoff &nbsp; wf=review &nbsp; risk=med &nbsp; human=yes</div>
-  <h2>Agent Handoff Protocol</h2>
-  <p>Pidgin is a compact, local-first protocol for structured handoffs between AI agents. Nine lines of key-value text, validated through a deterministic safety pipeline.</p>
-  <div class="cta">
-    <a href="#explorer" class="primary">Try it live</a>
-    <a href="https://github.com/manojpisini/pidgin" class="secondary" target="_blank">GitHub</a>
-  </div>
-</div>
-
-<!-- Pipeline -->
-<div class="section" id="pipeline">
-  <div class="section-label">Pipeline</div>
-  <div class="section-title">Every packet flows through 7 stages</div>
-  <div class="section-desc">Deterministic. No LLM calls. No network. Same input always produces same output.</div>
-  <div class="pipeline">
-    <div class="stage"><div class="name">Lexer</div><div class="desc">Tokenize</div></div>
-    <div class="arrow">&rarr;</div>
-    <div class="stage"><div class="name">Parser</div><div class="desc">Typed AST</div></div>
-    <div class="arrow">&rarr;</div>
-    <div class="stage"><div class="name">Syntax</div><div class="desc">Required fields</div></div>
-    <div class="arrow">&rarr;</div>
-    <div class="stage"><div class="name">Schema</div><div class="desc">Registry check</div></div>
-    <div class="arrow">&rarr;</div>
-    <div class="stage" style="border-color:#2a3a2a"><div class="name">Safety</div><div class="desc">9 rules (SG-1..9)</div></div>
-    <div class="arrow">&rarr;</div>
-    <div class="stage"><div class="name">Resolve</div><div class="desc">Refs &rarr; paths</div></div>
-    <div class="arrow">&rarr;</div>
-    <div class="stage"><div class="name">Expand</div><div class="desc">Executable YAML</div></div>
-  </div>
-</div>
-
-<!-- Features -->
-<div class="section" id="features">
-  <div class="section-label">Capabilities</div>
-  <div class="section-title">What Pidgin does</div>
-  <div class="grid">
-    <div class="card">
-      <div class="icon">&#9997;</div>
-      <h3>9-Line Packets</h3>
-      <p>Directive, workflow, mode, inputs, outputs, actions, deny list, risk level, human flag. Compact enough to paste in a chat message.</p>
+<div class="grid">
+  <!-- Header -->
+  <div class="header">
+    <div class="left">
+      <div class="dot"></div>
+      <h1>pidgin // protocol simulator</h1>
     </div>
-    <div class="card">
-      <div class="icon">&#128737;</div>
-      <h3>Safety Gate</h3>
-      <p>9 rules enforce at runtime: contradiction detection, human approval for dangerous actions, private path protection, critical-risk dual-packet approval.</p>
-    </div>
-    <div class="card">
-      <div class="icon">&#128279;</div>
-      <h3>Reference Resolution</h3>
-      <p>Short refs like <code>file:src/main.rs</code> or <code>ep:UNIT012</code> resolve to real paths with canonicalization, containment checks, and symlink traversal protection.</p>
-    </div>
-    <div class="card">
-      <div class="icon">&#128640;</div>
-      <h3>Executable Expansion</h3>
-      <p>Packets expand to fully-specified YAML with resolved paths, safety metadata, risk assessment, recommended executor, and fallback chains.</p>
-    </div>
-    <div class="card">
-      <div class="icon">&#128200;</div>
-      <h3>Token Estimation</h3>
-      <p>Estimate token cost of packets vs verbose natural language. Compare a 9-line .pgn against the equivalent paragraph of text.</p>
-    </div>
-    <div class="card">
-      <div class="icon">&#128274;</div>
-      <h3>Fail Closed</h3>
-      <p>Unknown workflow &rarr; blocked. Missing input &rarr; blocked. Ambiguous ref &rarr; blocked. If uncertain, the protocol says no.</p>
+    <div class="right">
+      <span>host:</span> <span id="host">loading...</span>
+      <span>status:</span> <span id="status" style="color:var(--green)">online</span>
+      <span>uptime:</span> <span id="uptime">0s</span>
     </div>
   </div>
-</div>
 
-<!-- Agents -->
-<div class="section" id="agents">
-  <div class="section-label">Integrations</div>
-  <div class="section-title">Works with your agents</div>
-  <div class="section-desc">Pidgin sits between any two agents as a validated handoff layer. No changes to your agent framework required.</div>
-  <div class="agents">
-    <div class="agent">
-      <div class="avatar" style="background:#2563eb">L</div>
-      <div class="info"><h4>LangGraph</h4><p>Pidgin node between graph steps</p></div>
-    </div>
-    <div class="agent">
-      <div class="avatar" style="background:#7c3aed">C</div>
-      <div class="info"><h4>CrewAI</h4><p>Validate agent task handoffs</p></div>
-    </div>
-    <div class="agent">
-      <div class="avatar" style="background:#059669">M</div>
-      <div class="info"><h4>MCP</h4><p>Pidgin as an MCP server tool</p></div>
-    </div>
-    <div class="agent">
-      <div class="avatar" style="background:#d97706">A</div>
-      <div class="info"><h4>A2A</h4><p>Expanded packets as A2A payloads</p></div>
-    </div>
-    <div class="agent">
-      <div class="avatar" style="background:#dc2626">P</div>
-      <div class="info"><h4>Python</h4><p>PyO3 native bindings (coming soon)</p></div>
-    </div>
-    <div class="agent">
-      <div class="avatar" style="background:#4338ca">H</div>
-      <div class="info"><h4>HTTP</h4><p>This server &mdash; POST .pgn text, get JSON</p></div>
+  <!-- Left Top: Pipeline -->
+  <div class="panel">
+    <div class="panel-title cyan">pipeline stages</div>
+    <div class="pipeline-vis" id="pipelineVis">
+      <div class="stage-row" id="s0"><span class="idx">01</span><span class="name">LEXER</span><span class="status pending" id="st0">pending</span><div class="bar" id="bar0" style="width:0%"></div></div>
+      <div class="stage-row" id="s1"><span class="idx">02</span><span class="name">PARSER</span><span class="status pending" id="st1">pending</span><div class="bar" id="bar1" style="width:0%"></div></div>
+      <div class="stage-row" id="s2"><span class="idx">03</span><span class="name">SYNTAX</span><span class="status pending" id="st2">pending</span><div class="bar" id="bar2" style="width:0%"></div></div>
+      <div class="stage-row" id="s3"><span class="idx">04</span><span class="name">SCHEMA</span><span class="status pending" id="st3">pending</span><div class="bar" id="bar3" style="width:0%"></div></div>
+      <div class="stage-row" id="s4"><span class="idx">05</span><span class="name">SAFETY</span><span class="status pending" id="st4">pending</span><div class="bar" id="bar4" style="width:0%"></div></div>
+      <div class="stage-row" id="s5"><span class="idx">06</span><span class="name">RESOLVE</span><span class="status pending" id="st5">pending</span><div class="bar" id="bar5" style="width:0%"></div></div>
+      <div class="stage-row" id="s6"><span class="idx">07</span><span class="name">EXPAND</span><span class="status pending" id="st6">pending</span><div class="bar" id="bar6" style="width:0%"></div></div>
     </div>
   </div>
-</div>
 
-<!-- Safety -->
-<div class="section" id="safety">
-  <div class="section-label">Safety Rules</div>
-  <div class="section-title">9 rules. Fail closed.</div>
-  <div class="rules">
-    <div class="rule"><span class="tag">SG-1</span><span class="text">Action in both <code>do</code> and <code>deny</code> &rarr; blocked</span></div>
-    <div class="rule"><span class="tag">SG-2</span><span class="text">Human-gated action without <code>human=yes</code> &rarr; blocked</span></div>
-    <div class="rule"><span class="tag">SG-3</span><span class="text">High/critical risk forces <code>human=yes</code>, cannot override</span></div>
-    <div class="rule"><span class="tag">SG-4</span><span class="text">References to private paths (.env, *.key, .git/) &rarr; blocked</span></div>
-    <div class="rule"><span class="tag">SG-5</span><span class="text">Unknown workflow not in registry &rarr; blocked</span></div>
-    <div class="rule"><span class="tag">SG-6</span><span class="text">Invalid mode for the workflow &rarr; blocked</span></div>
-    <div class="rule"><span class="tag">SG-7</span><span class="text"><code>note</code> field is never parsed for instructions</span></div>
-    <div class="rule"><span class="tag">SG-8</span><span class="text">Unresolved required inputs &rarr; expansion blocked</span></div>
-    <div class="rule"><span class="tag">SG-9</span><span class="text">Critical risk requires <code>@approval</code> packet</span></div>
+  <!-- Right Top: Agent Handoff -->
+  <div class="panel">
+    <div class="panel-title green">agent handoff simulation</div>
+    <div class="handoff-vis" id="handoffVis">
+      <div class="agent-node" id="agentA" style="left:20px;top:50%;transform:translateY(-50%)">
+        <div class="icon">&#129302;</div>
+        <div class="label">AGENT A</div>
+      </div>
+      <div class="arrow-line" id="arrowA" style="left:100px;top:50%;width:80px"></div>
+      <div class="packet-dot" id="dotA"></div>
+      <div class="pidgin-node" id="pidginNode" style="left:50%;top:50%;transform:translate(-50%,-50%)">
+        <div class="icon" style="color:var(--green)">P</div>
+        <div class="label" style="color:var(--dim)">pidgin</div>
+      </div>
+      <div class="arrow-line" id="arrowB" style="right:100px;top:50%;width:80px"></div>
+      <div class="packet-dot" id="dotB"></div>
+      <div class="agent-node" id="agentB" style="right:20px;top:50%;transform:translateY(-50%)">
+        <div class="icon">&#128187;</div>
+        <div class="label">AGENT B</div>
+      </div>
+      <div id="handoffStatus" style="position:absolute;bottom:8px;font-size:10px;color:var(--dim)">idle</div>
+    </div>
   </div>
-</div>
 
-<!-- Grammar -->
-<div class="section" id="grammar">
-  <div class="section-label">Protocol</div>
-  <div class="section-title">Packet grammar</div>
-  <div class="grammar">
-<span class="comment"># Header — directive + run ID</span>
-<span class="kw">@run</span> <span class="val">agent.task_name</span>
-
-<span class="comment"># Key-value fields</span>
-<span class="field">wf</span>=<span class="val">generic_review</span>
-<span class="field">mode</span>=<span class="val">draft</span>
-<span class="field">in</span>=[<span class="val">primary_subject, source_refs</span>]
-<span class="field">out</span>=[<span class="val">review_notes</span>]
-<span class="field">do</span>=[<span class="val">draft, review</span>]
-<span class="field">deny</span>=[<span class="val">publish, send, delete, secrets</span>]
-<span class="field">risk</span>=<span class="val">med</span>
-<span class="field">human</span>=<span class="val">yes</span>
-
-<span class="comment"># Directives: @run, @result, @approval, @context</span>
-<span class="comment"># References: file:path, ep:id, workflow:name, or bare aliases</span>
-<span class="comment"># Risk: low | med | high | crit</span>
+  <!-- Left Bottom: Event Log -->
+  <div class="panel">
+    <div class="panel-title purple">event log</div>
+    <div class="log" id="eventLog">
+      <div class="log-entry"><span class="ts">--:--:--</span><span class="ev">system initialized, waiting for packet...</span></div>
+    </div>
   </div>
-</div>
 
-<!-- API Explorer -->
-<div class="section" id="explorer">
-  <div class="section-label">API Explorer</div>
-  <div class="section-title">Try it live</div>
-  <div class="section-desc">Paste a .pgn packet and hit any endpoint. The server runs the full pipeline.</div>
-  <div class="explorer">
-    <div>
-      <textarea id="packet" spellcheck="false">@run example.task
+  <!-- Right Bottom: Packet Inspector -->
+  <div class="panel">
+    <div class="panel-title yellow">packet inspector</div>
+    <div class="inspector">
+      <div class="col"><div class="col-title">.pgn input</div><pre id="pgnInput">--</pre></div>
+      <div class="col"><div class="col-title">expanded output</div><pre id="pgnOutput">--</pre></div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <textarea id="packetInput" spellcheck="false">@run code.review
 wf=generic_review
 mode=draft
-in=[primary_subject,source_refs]
+in=[src/main.rs,tests/]
 out=[review_notes]
 do=[draft,review]
 deny=[publish,send,delete,secrets]
 risk=med
 human=yes</textarea>
-      <div class="btn-row">
-        <button class="btn-run" onclick="call('parse')">Parse</button>
-        <button class="btn-run" onclick="call('validate')">Validate</button>
-        <button class="btn-run" onclick="call('check')">Check</button>
-        <button class="btn-run" onclick="call('expand')">Expand</button>
-        <button class="btn-run" onclick="call('run')">Run</button>
-        <button class="btn-sec" onclick="loadExample('safe')">Example: Safe</button>
-        <button class="btn-sec" onclick="loadExample('unsafe')">Example: Unsafe</button>
-        <button class="btn-sec" onclick="loadExample('crit')">Example: Critical</button>
-      </div>
+    <div class="btns">
+      <button class="btn-sim" onclick="runSimulation()">SIMULATE</button>
+      <button class="btn-rst" onclick="resetAll()">RESET</button>
     </div>
-    <div class="result-panel" id="result">Click an endpoint to see the response.</div>
-  </div>
-  <div class="timing" id="timing"></div>
-</div>
-
-<!-- CLI -->
-<div class="section" id="cli">
-  <div class="section-label">CLI</div>
-  <div class="section-title">All commands</div>
-  <div class="cli-grid">
-    <div class="cli-item"><code>pgn parse</code><span>Parse a packet, print AST</span></div>
-    <div class="cli-item"><code>pgn validate</code><span>Syntax + schema validation</span></div>
-    <div class="cli-item"><code>pgn check</code><span>Validate &rarr; safety &rarr; resolve</span></div>
-    <div class="cli-item"><code>pgn resolve</code><span>Resolve all short references</span></div>
-    <div class="cli-item"><code>pgn expand</code><span>Expand to executable YAML</span></div>
-    <div class="cli-item"><code>pgn run</code><span>Full pipeline end-to-end</span></div>
-    <div class="cli-item"><code>pgn measure</code><span>Estimate token cost</span></div>
-    <div class="cli-item"><code>pgn compare</code><span>Compare .pgn vs verbose text</span></div>
-    <div class="cli-item"><code>pgn context-plan</code><span>Build retrieval plan</span></div>
-    <div class="cli-item"><code>pgn serve</code><span>Start this HTTP server</span></div>
-    <div class="cli-item"><code>pgn init</code><span>Scaffold .pidgin/ config</span></div>
-    <div class="cli-item"><code>pgn doctor</code><span>Check host configuration</span></div>
-    <div class="cli-item"><code>pgn docs</code><span>Print protocol spec</span></div>
+    <div class="btns">
+      <button class="btn-ex" onclick="loadEx('safe')">safe</button>
+      <button class="btn-ex" onclick="loadEx('unsafe')">unsafe</button>
+      <button class="btn-ex" onclick="loadEx('crit')">crit</button>
+      <button class="btn-ex" onclick="loadEx('traversal')">traversal</button>
+    </div>
   </div>
 </div>
-
-<footer>
-  pidgin v<span id="footerv">?</span> &middot; agent handoff protocol &middot; <a href="https://github.com/manojpisini/pidgin" target="_blank">github.com/manojpisini/pidgin</a>
-</footer>
 
 <script>
-  const examples = {
-    safe: `@run code.review
-wf=generic_review
-mode=draft
-in=[src/main.rs, tests/]
-out=[review_notes]
-do=[draft,review]
-deny=[publish,send]
-risk=low
-human=no`,
-    unsafe: `@run publish.post
-wf=generic_draft_and_distribute
-mode=approval
-in=[draft_content]
-out=[publish_result]
-do=[publish,send]
-deny=[publish,send]
-risk=med
-human=yes`,
-    crit: `@run deploy.prod
-wf=generic_review
-mode=approval
-in=[deploy_config]
-out=[deploy_result]
-do=[publish,delete]
-deny=[]
-risk=crit
-human=no`
-  };
+const $ = id => document.getElementById(id);
+let running = false, startTime = Date.now(), eventCount = 0;
 
-  function loadExample(name) {
-    document.getElementById('packet').value = examples[name];
-    document.getElementById('result').textContent = 'Loaded. Click an endpoint.';
-    document.getElementById('result').style.color = '#666';
+// Examples
+const examples = {
+  safe: `@run code.review\nwf=generic_review\nmode=draft\nin=[src/main.rs,tests/]\nout=[review_notes]\n do=[draft,review]\ndeny=[publish,send,delete,secrets]\nrisk=med\nhuman=yes`,
+  unsafe: `@run publish.post\nwf=generic_draft_and_distribute\nmode=approval\nin=[draft_content]\nout=[result]\n do=[publish,send]\ndeny=[publish,send]\nrisk=med\nhuman=yes`,
+  crit: `@run deploy.prod\nwf=generic_review\nmode=approval\nin=[deploy_config]\nout=[result]\n do=[publish,delete]\ndeny=[]\nrisk=crit\nhuman=no`,
+  traversal: `@run secret.read\nwf=generic_review\nmode=draft\nin=[file:.env,file:../../../etc/passwd]\nout=[notes]\n do=[read]\ndeny=[]\nrisk=low\nhuman=no`
+};
+function loadEx(k) { $('packetInput').value = examples[k]; }
+
+// Timing
+setInterval(() => {
+  const s = Math.floor((Date.now()-startTime)/1000);
+  const m = Math.floor(s/60), h = Math.floor(m/60);
+  $('uptime').textContent = h>0 ? `${h}h${m%60}m` : m>0 ? `${m}m${s%60}s` : `${s}s`;
+}, 1000);
+
+// Health check
+async function health() {
+  try {
+    const r = await fetch('/api/v1/health');
+    const d = await r.json();
+    $('host').textContent = d.data.host.split('\\').pop();
+  } catch { $('host').textContent = 'disconnected'; $('status').style.color = 'var(--red)'; }
+}
+health();
+
+// Logging
+function log(tag, msg) {
+  const now = new Date();
+  const ts = [now.getHours(),now.getMinutes(),now.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  entry.innerHTML = `<span class="ts">${ts}</span><span class="ev"><span class="tag ${tag}">${tag.toUpperCase()}</span>${msg}</span>`;
+  $('eventLog').appendChild(entry);
+  $('eventLog').scrollTop = $('eventLog').scrollHeight;
+  eventCount++;
+}
+
+// Pipeline animation
+const stageNames = ['LEXER','PARSER','SYNTAX','SCHEMA','SAFETY','RESOLVE','EXPAND'];
+let stageResults = [];
+
+function setStage(i, status, pct) {
+  const row = $('s'+i);
+  const st = $('st'+i);
+  const bar = $('bar'+i);
+  row.className = 'stage-row ' + (status==='running'?'active':status==='pass'?'done':status==='fail'?'fail':'');
+  st.className = 'status ' + status;
+  st.textContent = status;
+  bar.style.width = (pct||0) + '%';
+}
+
+function resetPipeline() {
+  for(let i=0;i<7;i++){setStage(i,'pending',0); stageResults[i]=null;}
+}
+
+// Handoff animation
+function resetHandoff() {
+  $('agentA').className='agent-node'; $('agentB').className='agent-node';
+  $('pidginNode').className='pidgin-node';
+  $('arrowA').className='arrow-line'; $('arrowB').className='arrow-line';
+  $('dotA').className='packet-dot'; $('dotB').className='packet-dot';
+  $('handoffStatus').textContent='idle';
+}
+
+async function animateHandoff(phase) {
+  if(phase==='send') {
+    $('agentA').classList.add('active');
+    $('handoffStatus').textContent='agent A encoding packet...';
+    log('agent','Agent A encoding .pgn packet');
+    await delay(400);
+    $('arrowA').classList.add('active');
+    $('dotA').style.left='100px'; $('dotA').style.top='50%';
+    $('dotA').classList.add('show');
+    $('handoffStatus').textContent='sending packet to pidgin...';
+    log('handoff','Agent A -> Pidgin: transmitting packet');
+    for(let x=100;x<=180;x+=4){$('dotA').style.left=x+'px';await delay(10);}
+    $('dotA').classList.remove('show');
+  } else if(phase==='process') {
+    $('pidginNode').classList.add('active');
+    $('handoffStatus').textContent='pidgin processing...';
+    log('pidgin','Pidgin pipeline: validate -> safety -> resolve -> expand');
+    await delay(300);
+  } else if(phase==='receive') {
+    $('arrowB').classList.add('active');
+    $('dotB').style.right='100px'; $('dotB').style.top='50%';
+    $('dotB').classList.add('show');
+    $('handoffStatus').textContent='delivering to agent B...';
+    log('handoff','Pidgin -> Agent B: delivering expanded packet');
+    for(let x=100;x<=180;x+=4){$('dotB').style.right=x+'px';await delay(10);}
+    $('dotB').classList.remove('show');
+    $('agentB').classList.add('active');
+    $('handoffStatus').textContent='agent B received expanded packet';
+    log('agent','Agent B received expanded YAML, executing workflow');
+  }
+}
+
+// Simulate
+async function runSimulation() {
+  if(running) return;
+  running = true;
+  resetPipeline();
+  resetHandoff();
+
+  const pgn = $('packetInput').value;
+  $('pgnInput').textContent = pgn;
+  $('pgnOutput').textContent = '--';
+
+  log('system','Simulation started');
+  log('parse','Input: ' + pgn.split('\n')[0]);
+
+  // Start handoff animation
+  animateHandoff('send');
+
+  // Run actual API calls with staged animation
+  const stages = [
+    {name:'parse', api:'parse', delay:300},
+    {name:'validate', api:'validate', delay:400},
+    {name:'check', api:'check', delay:600},
+    {name:'expand', api:'expand', delay:400},
+    {name:'run', api:'run', delay:500}
+  ];
+
+  // Stage-by-stage animation
+  for(let i=0;i<7;i++) {
+    setStage(i,'running',0);
+    const dur = 150 + Math.random()*200;
+    for(let p=0;p<=100;p+=5){setStage(i,'running',p);await delay(dur/20);}
   }
 
-  async function healthCheck() {
-    try {
-      const r = await fetch('/api/v1/health');
-      const d = await r.json();
-      document.getElementById('version').textContent = 'v' + d.data.version;
-      document.getElementById('footerv').textContent = d.data.version;
-    } catch {}
-  }
-  healthCheck();
+  // Call actual APIs
+  let parseResult, validateResult, checkResult, runResult;
 
-  async function call(endpoint) {
-    const body = document.getElementById('packet').value;
-    const resultEl = document.getElementById('result');
-    const timingEl = document.getElementById('timing');
-    resultEl.textContent = 'Running POST /api/v1/' + endpoint + ' ...';
-    resultEl.style.color = '#666';
-    const t0 = performance.now();
-    try {
-      const r = await fetch('/api/v1/' + endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: body
-      });
-      const d = await r.json();
-      const ms = Math.round(performance.now() - t0);
-      timingEl.textContent = endpoint + ' responded in ' + ms + 'ms';
-      resultEl.style.color = d.ok ? '#4ade80' : '#f87171';
-      resultEl.textContent = JSON.stringify(d, null, 2);
-    } catch (e) {
-      resultEl.style.color = '#f87171';
-      resultEl.textContent = 'Error: ' + e.message;
-    }
+  // Parse
+  setStage(0,'running',50);
+  parseResult = await apiCall('parse', pgn);
+  setStage(0, parseResult.ok?'pass':'fail', 100);
+  log('parse', parseResult.ok ? `directive=${parseResult.data.directive}, run_id=${parseResult.data.run_id}` : `ERROR: ${parseResult.error}`);
+  await delay(200);
+
+  // Validate
+  setStage(1,'running',50);
+  setStage(2,'running',50);
+  validateResult = await apiCall('validate', pgn);
+  setStage(1, validateResult.ok?'pass':'fail', 100);
+  setStage(2, validateResult.ok?'pass':'fail', 100);
+  const valCount = validateResult.ok ? validateResult.data.length : 0;
+  log('syntax', valCount===0 ? 'all required fields present' : `${valCount} validation errors`);
+  await delay(200);
+
+  // Schema
+  setStage(3,'running',50);
+  setStage(3, validateResult.ok?'pass':'fail', 100);
+  log('schema', validateResult.ok ? 'workflow, mode, risk all valid' : 'schema check failed');
+  await delay(200);
+
+  // Check (safety + resolve)
+  setStage(4,'running',50);
+  checkResult = await apiCall('check', pgn);
+  setStage(4, checkResult.ok?'pass':'fail', 100);
+  if(checkResult.ok) {
+    const s = checkResult.data.safety;
+    log('safety', s.blocked ? `BLOCKED: ${s.fired_rules.join(', ')}` : `PASS: ${s.fired_rules.length} rules fired`);
+    if(s.human_required) log('safety','human approval required');
+  } else {
+    log('error', `Safety check failed: ${checkResult.error}`);
   }
+  await delay(200);
+
+  // Resolve
+  setStage(5,'running',50);
+  if(checkResult.ok) {
+    const resolved = checkResult.data.resolution.filter(r=>r.status==='RESOLVED').length;
+    const unresolved = checkResult.data.resolution.filter(r=>r.status!=='RESOLVED').length;
+    setStage(5, unresolved===0?'pass':'fail', 100);
+    log('resolve', `${resolved} resolved, ${unresolved} unresolved`);
+    checkResult.data.resolution.forEach(r => {
+      if(r.status!=='RESOLVED') log('resolve', `  ${r.original} -> ${r.status}`);
+    });
+  }
+  await delay(200);
+
+  // Expand
+  setStage(6,'running',50);
+  runResult = await apiCall('run', pgn);
+  setStage(6, runResult.ok?'pass':'fail', 100);
+  if(runResult.ok) {
+    $('pgnOutput').textContent = runResult.data.yaml;
+    log('expand', `expanded to YAML, route: ${runResult.data.route}`);
+    log('route', `recommended executor: ${runResult.data.safety.blocked ? 'BLOCKED' : 'proceed'}`);
+  } else {
+    log('error', `Expand failed: ${runResult.error}`);
+    $('pgnOutput').textContent = `ERROR: ${runResult.error}`;
+  }
+
+  // Complete handoff
+  animateHandoff('process');
+  await delay(600);
+  animateHandoff('receive');
+
+  log('system', `Simulation complete. ${eventCount} events logged.`);
+  running = false;
+}
+
+async function apiCall(endpoint, body) {
+  try {
+    const r = await fetch('/api/v1/' + endpoint, {
+      method: 'POST', headers: {'Content-Type':'text/plain'}, body
+    });
+    return await r.json();
+  } catch(e) { return {ok:false, error:e.message}; }
+}
+
+function delay(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+function resetAll() {
+  running = false;
+  resetPipeline();
+  resetHandoff();
+  $('pgnInput').textContent='--';
+  $('pgnOutput').textContent='--';
+  $('eventLog').innerHTML='<div class="log-entry"><span class="ts">--:--:--</span><span class="ev">system reset, waiting for packet...</span></div>';
+  eventCount = 0;
+}
 </script>
 </body>
 </html>
