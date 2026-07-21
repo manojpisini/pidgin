@@ -247,9 +247,10 @@ table{max-width:100%}
   <div class="panel-header">
     <span>COMMUNICATIONS GRAPH <i class="status-dot"></i> <span class="live">LIVE</span></span>
     <div class="controls">
-      <span>LAYOUT:</span><select id="layoutSelect"><option value="fixed">FORCE</option><option value="hierarchical">HIERARCHY</option></select>
+      <span>LAYOUT:</span><select id="layoutSelect"><option value="force">FORCE</option><option value="hierarchical">HIERARCHY</option></select>
       <span>FILTER:</span><select id="filterSelect"><option value="all">ALL</option><option value="agents">AGENTS</option><option value="infra">INFRA</option></select>
       <button id="fitGraph">FIT</button><button id="stabilizeGraph">STABILIZE</button>
+      <span id="layoutBadge" style="color:var(--green);font-size:8px">&#x25CF; FORCE</span>
     </div>
   </div>
   <div class="graph-shell">
@@ -1062,10 +1063,21 @@ network.once('stabilizationIterationsDone',()=>{network.setOptions({physics:fals
 network.on('selectNode',p=>{const n=nodes.get(p.nodes[0]);document.getElementById('graphTip').textContent=n.label.replace(/\n/g,'  |  ')});
 network.on('selectEdge',p=>{const e=edges.get(p.edges[0]);document.getElementById('graphTip').textContent='FLOW '+e.from+' \u2192 '+e.to+'  |  '+e.label});
 document.getElementById('fitGraph').onclick=()=>network.fit({animation:true});
-document.getElementById('stabilizeGraph').onclick=()=>{network.setOptions({physics:true});network.stabilize(180);setTimeout(()=>network.setOptions({physics:false}),1500)};
+document.getElementById('stabilizeGraph').onclick=layoutForce;
+const badge=document.getElementById('layoutBadge');
+function layoutForce(){
+  network.setOptions({layout:{hierarchical:{enabled:false}},physics:{enabled:true,solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-65,centralGravity:.008,springLength:150,springConstant:.035,damping:.5},stabilization:{iterations:220,updateInterval:25,fit:true}}});
+  network.once('stabilizationIterationsDone',()=>{network.setOptions({physics:false});network.fit({animation:{duration:450,easingFunction:'easeInOutQuad'}})});
+  network.stabilize(220);
+  badge.textContent='\u25CF FORCE';
+}
+function layoutHierarchy(){
+  network.setOptions({physics:false,layout:{hierarchical:{enabled:true,direction:'UD',sortMethod:'directed',levelSeparation:120,nodeSpacing:180,edgeMinimization:true,treeSpacing:160}}});
+  network.fit({animation:{duration:450,easingFunction:'easeInOutQuad'}});
+  badge.textContent='\u25B2 HIERARCHY';
+}
 document.getElementById('layoutSelect').onchange=e=>{
- if(e.target.value==='hierarchical'){network.setOptions({layout:{hierarchical:{enabled:true,direction:'UD',sortMethod:'directed',levelSeparation:110,nodeSpacing:155}},physics:false});network.fit({animation:true})}
- else{network.setOptions({layout:{hierarchical:{enabled:false}},physics:true});network.stabilize(180);setTimeout(()=>network.setOptions({physics:false}),1500)}
+  if(e.target.value==='hierarchical')layoutHierarchy();else layoutForce()
 };
 document.getElementById('filterSelect').onchange=e=>{
  const v=e.target.value;
