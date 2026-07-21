@@ -3,434 +3,405 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pidgin // agent protocol simulator</title>
+<title>pidgin // protocol sim</title>
 <style>
-  :root { --bg: #06080a; --panel: #0c0f12; --border: #151a1f; --accent: #22d3ee; --green: #34d399; --red: #f87171; --yellow: #fbbf24; --purple: #a78bfa; --blue: #60a5fa; --dim: #374151; --text: #9ca3af; --bright: #e5e7eb; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+  :root {
+    --bg: #000000; --panel: #050505; --border: #0a0a0a;
+    --accent: #00ff41; --green: #00ff41; --red: #ff0040; --yellow: #ffae00; --purple: #b400ff; --blue: #0070ff; --cyan: #00e5ff;
+    --dim: #1a1a1a; --text: #2a2a2a; --bright: #3a3a3a; --white: #e0e0e0;
+    --glow: 0 0 4px rgba(0,255,65,0.3);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New',monospace; background:var(--bg); color:var(--text); height:100vh; overflow:hidden; }
 
-  /* Grid layout */
-  .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; gap: 1px; background: var(--border); min-height: 100vh; }
-  .grid > * { background: var(--bg); }
-  .header { grid-column: 1 / -1; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border); }
-  .header .left { display: flex; align-items: center; gap: 12px; }
-  .header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
-  @keyframes blink { 0%,100%{opacity:1}50%{opacity:.3} }
-  .header h1 { font-size: 13px; font-weight: 600; color: var(--accent); letter-spacing: 1px; text-transform: uppercase; }
-  .header .right { font-size: 11px; color: var(--dim); display: flex; gap: 16px; }
-  .header .right span { color: var(--text); }
+  .grid {
+    display: grid;
+    grid-template-columns: 280px 1fr 1fr;
+    grid-template-rows: 32px 1fr 1fr 140px;
+    gap: 1px;
+    background: var(--border);
+    height: 100vh;
+  }
+  .grid > * { background: var(--panel); }
+
+  /* Header */
+  .hdr { grid-column:1/-1; display:flex; align-items:center; padding:0 12px; gap:12px; border-bottom:1px solid var(--border); }
+  .hdr .blink { width:5px; height:5px; border-radius:50%; background:var(--green); animation:bk 1.5s infinite; }
+  @keyframes bk { 0%,100%{opacity:1}50%{opacity:.15} }
+  .hdr .title { font-size:11px; color:var(--green); letter-spacing:2px; text-transform:uppercase; }
+  .hdr .sep { color:var(--dim); }
+  .hdr .info { font-size:10px; color:var(--dim); }
+  .hdr .info b { color:var(--text); font-weight:400; }
+  .hdr .right { margin-left:auto; display:flex; gap:16px; }
 
   /* Panels */
-  .panel { padding: 12px; overflow: hidden; display: flex; flex-direction: column; }
-  .panel-title { font-size: 10px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
-  .panel-title::before { content: ''; width: 4px; height: 4px; border-radius: 1px; }
-  .panel-title.cyan::before { background: var(--accent); }
-  .panel-title.green::before { background: var(--green); }
-  .panel-title.purple::before { background: var(--purple); }
-  .panel-title.yellow::before { background: var(--yellow); }
-  .panel-title.red::before { background: var(--red); }
+  .panel { padding:8px 10px; display:flex; flex-direction:column; overflow:hidden; }
+  .ptitle { font-size:8px; color:var(--dim); text-transform:uppercase; letter-spacing:2px; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
+  .ptitle::before { content:''; width:3px; height:3px; }
+  .ptitle.c::before { background:var(--green); }
+  .ptitle.p::before { background:var(--purple); }
+  .ptitle.y::before { background:var(--yellow); }
+  .ptitle.r::before { background:var(--red); }
+  .ptitle.b::before { background:var(--blue); }
 
-  /* Pipeline Visualizer */
-  .pipeline-vis { flex: 1; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
-  .stage-row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; font-size: 11px; transition: all 0.3s; position: relative; }
-  .stage-row.active { border-color: var(--accent); background: rgba(34,211,238,0.05); }
-  .stage-row.done { border-color: var(--green); background: rgba(52,211,153,0.05); }
-  .stage-row.fail { border-color: var(--red); background: rgba(248,113,113,0.05); }
-  .stage-row .idx { color: var(--dim); width: 20px; text-align: right; }
-  .stage-row .name { color: var(--bright); width: 90px; }
-  .stage-row .status { margin-left: auto; font-size: 10px; padding: 2px 6px; border-radius: 3px; }
-  .status.pending { background: #1a1a2a; color: var(--dim); }
-  .status.running { background: #1a2a2a; color: var(--accent); animation: pulse 1s infinite; }
-  .status.pass { background: #1a2a1a; color: var(--green); }
-  .status.fail { background: #2a1a1a; color: var(--red); }
-  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
-  .stage-row .bar { position: absolute; bottom: 0; left: 0; height: 2px; background: var(--accent); border-radius: 0 0 4px 4px; transition: width 0.3s; }
+  /* Pipeline */
+  #pipeline { grid-column:1; grid-row:2/4; overflow-y:auto; }
+  .stg { display:flex; align-items:center; gap:6px; padding:5px 8px; margin-bottom:1px; font-size:10px; border-left:2px solid transparent; }
+  .stg.idle { border-left-color:var(--dim); }
+  .stg.run { border-left-color:var(--accent); background:rgba(0,255,65,0.03); }
+  .stg.pass { border-left-color:var(--green); }
+  .stg.fail { border-left-color:var(--red); }
+  .stg .n { color:var(--dim); width:16px; }
+  .stg .nm { color:var(--bright); width:60px; }
+  .stg .inf { color:var(--dim); font-size:9px; margin-left:auto; }
+  .stg .bar { position:absolute; bottom:0; left:0; height:1px; background:var(--accent); transition:width .2s; }
 
-  /* Agent Network */
-  .network-canvas { flex: 1; position: relative; }
-  .network-canvas canvas { width: 100%; height: 100%; }
+  /* Chat Comms */
+  #chat { grid-column:2/4; grid-row:2/4; overflow:hidden; }
+  .chat-scroll { height:100%; overflow-y:auto; padding-bottom:4px; }
+  .msg { margin-bottom:2px; display:flex; gap:8px; align-items:flex-start; padding:3px 6px; }
+  .msg .ts { color:var(--dim); font-size:9px; flex-shrink:0; width:56px; }
+  .msg .src { font-size:9px; flex-shrink:0; padding:1px 4px; border-radius:2px; text-transform:uppercase; font-weight:600; letter-spacing:1px; }
+  .msg .src.sys { background:#0a0a0a; color:var(--green); border:1px solid #0f0f0f; }
+  .msg .src.ag { background:#0a000a; color:var(--purple); border:1px solid #0f000f; }
+  .msg .src.srv { background:#000a0a; color:var(--cyan); border:1px solid #000f0f; }
+  .msg .src.err { background:#0a0000; color:var(--red); border:1px solid #0f0000; }
+  .msg .body { color:var(--text); font-size:10px; line-height:1.4; word-break:break-all; }
+  .msg .body .enc { color:var(--green); opacity:.6; }
+  .msg .body .key { color:var(--yellow); }
+  .msg .body .addr { color:var(--cyan); }
+  .msg .body .pkt { color:var(--purple); }
+  .msg .body .ok { color:var(--green); }
+  .msg .body .no { color:var(--red); }
+  .msg .body .warn { color:var(--yellow); }
+  .msg .hdr-line { color:var(--dim); font-size:9px; padding:2px 6px; }
+  .msg .hex { color:var(--dim); font-size:9px; opacity:.4; }
 
-  /* Event Log */
-  .log { flex: 1; overflow-y: auto; font-size: 11px; line-height: 1.6; }
-  .log-entry { display: flex; gap: 8px; padding: 2px 0; }
-  .log-entry .ts { color: var(--dim); flex-shrink: 0; }
-  .log-entry .ev { color: var(--text); }
-  .log-entry .ev .tag { padding: 1px 5px; border-radius: 2px; font-size: 10px; margin-right: 4px; }
-  .tag.parse { background: #1a1a2a; color: var(--blue); }
-  .tag.safety { background: #1a2a1a; color: var(--green); }
-  .tag.resolve { background: #2a1a2a; color: var(--purple); }
-  .tag.expand { background: #2a2a1a; color: var(--yellow); }
-  .tag.route { background: #1a2a2a; color: var(--accent); }
-  .tag.error { background: #2a1a1a; color: var(--red); }
-  .tag.agent { background: #1a1a2a; color: var(--blue); }
-  .tag.handoff { background: #2a1a2a; color: var(--accent); }
+  /* Inspector */
+  #inspector { grid-column:1; grid-row:4; overflow:hidden; display:flex; flex-direction:column; }
+  .insp-cols { flex:1; display:flex; gap:1px; background:var(--border); overflow:hidden; }
+  .insp-col { flex:1; background:var(--panel); padding:6px; overflow-y:auto; }
+  .insp-col .ct { font-size:8px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:4px; }
+  .insp-col pre { font-size:10px; color:var(--text); line-height:1.4; white-space:pre-wrap; word-break:break-all; }
 
-  /* Packet Inspector */
-  .inspector { display: flex; gap: 1px; background: var(--border); border-radius: 4px; overflow: hidden; flex: 1; }
-  .inspector .col { flex: 1; background: var(--panel); padding: 10px; overflow: auto; }
-  .inspector .col-title { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-  .inspector pre { font-size: 11px; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-all; }
-  .inspector pre .kw { color: var(--accent); }
-  .inspector pre .val { color: var(--green); }
-  .inspector pre .field { color: var(--blue); }
+  /* Input */
+  #input { grid-column:2; grid-row:4; padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
+  #input textarea { flex:1; width:100%; background:var(--panel); border:1px solid var(--border); color:var(--green); font-family:inherit; font-size:10px; padding:6px; resize:none; outline:none; }
+  #input textarea:focus { border-color:var(--accent); }
+  #input .btn-row { display:flex; gap:4px; }
+  #input button { padding:4px 10px; border:none; background:var(--border); color:var(--text); font-family:inherit; font-size:10px; cursor:pointer; }
+  #input button:hover { background:var(--accent); color:#000; }
+  #input button.act { background:var(--accent); color:#000; }
 
-  /* Controls */
-  .controls { grid-column: 1 / -1; padding: 10px 16px; border-top: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
-  .controls textarea { flex: 1; height: 60px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; color: var(--bright); font-family: inherit; font-size: 11px; padding: 8px; resize: none; outline: none; }
-  .controls textarea:focus { border-color: var(--accent); }
-  .controls .btns { display: flex; flex-direction: column; gap: 4px; }
-  .controls button { padding: 6px 14px; border: none; border-radius: 3px; font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-  .btn-sim { background: var(--accent); color: #000; }
-  .btn-sim:hover { background: #06b6d4; }
-  .btn-rst { background: var(--border); color: var(--dim); }
-  .btn-rst:hover { background: #1a1a1a; color: var(--text); }
-  .btn-ex { background: transparent; color: var(--dim); border: 1px solid var(--border); font-size: 10px; }
-  .btn-ex:hover { border-color: var(--accent); color: var(--accent); }
+  /* Stats */
+  #stats { grid-column:3; grid-row:4; padding:8px 10px; }
+  .stat-row { display:flex; justify-content:space-between; font-size:10px; padding:2px 0; border-bottom:1px solid var(--border); }
+  .stat-row .k { color:var(--dim); }
+  .stat-row .v { color:var(--text); }
+  .stat-row .v.ok { color:var(--green); }
+  .stat-row .v.no { color:var(--red); }
 
-  /* Handoff Vis */
-  .handoff-vis { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 16px; position: relative; }
-  .agent-node { width: 80px; height: 80px; border-radius: 50%; border: 2px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; transition: all 0.4s; position: relative; }
-  .agent-node.active { border-color: var(--accent); box-shadow: 0 0 20px rgba(34,211,238,0.2); }
-  .agent-node .icon { font-size: 20px; margin-bottom: 2px; }
-  .agent-node .label { color: var(--dim); font-size: 9px; }
-  .pidgin-node { width: 60px; height: 60px; border-radius: 12px; border: 2px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; transition: all 0.4s; }
-  .pidgin-node.active { border-color: var(--green); box-shadow: 0 0 20px rgba(52,211,153,0.2); }
-  .pidgin-node .icon { font-size: 16px; }
-  .arrow-line { position: absolute; height: 2px; background: var(--border); transition: background 0.3s; }
-  .arrow-line.active { background: var(--accent); box-shadow: 0 0 8px rgba(34,211,238,0.4); }
-  .packet-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); position: absolute; opacity: 0; transition: all 0.6s ease-in-out; }
-  .packet-dot.show { opacity: 1; }
-  .handoff-label { font-size: 9px; color: var(--dim); position: absolute; }
-
-  /* Scrollbar */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  ::-webkit-scrollbar { width:3px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--dim); }
 </style>
 </head>
 <body>
-
 <div class="grid">
   <!-- Header -->
-  <div class="header">
-    <div class="left">
-      <div class="dot"></div>
-      <h1>pidgin // protocol simulator</h1>
-    </div>
+  <div class="hdr">
+    <div class="blink"></div>
+    <span class="title">pidgin</span>
+    <span class="sep">/</span>
+    <span class="info">v0.2.0</span>
     <div class="right">
-      <span>host:</span> <span id="host">loading...</span>
-      <span>status:</span> <span id="status" style="color:var(--green)">online</span>
-      <span>uptime:</span> <span id="uptime">0s</span>
+      <span class="info"><b>host</b> <span id="hHost">--</span></span>
+      <span class="info"><b>uptime</b> <span id="hUp">0</span></span>
+      <span class="info"><b>pkts</b> <span id="hPkts">0</span></span>
+      <span class="info"><b>blocks</b> <span id="hBlocks">0</span></span>
+      <span class="info" id="hSt" style="color:var(--green)">ONLINE</span>
     </div>
   </div>
 
-  <!-- Left Top: Pipeline -->
-  <div class="panel">
-    <div class="panel-title cyan">pipeline stages</div>
-    <div class="pipeline-vis" id="pipelineVis">
-      <div class="stage-row" id="s0"><span class="idx">01</span><span class="name">LEXER</span><span class="status pending" id="st0">pending</span><div class="bar" id="bar0" style="width:0%"></div></div>
-      <div class="stage-row" id="s1"><span class="idx">02</span><span class="name">PARSER</span><span class="status pending" id="st1">pending</span><div class="bar" id="bar1" style="width:0%"></div></div>
-      <div class="stage-row" id="s2"><span class="idx">03</span><span class="name">SYNTAX</span><span class="status pending" id="st2">pending</span><div class="bar" id="bar2" style="width:0%"></div></div>
-      <div class="stage-row" id="s3"><span class="idx">04</span><span class="name">SCHEMA</span><span class="status pending" id="st3">pending</span><div class="bar" id="bar3" style="width:0%"></div></div>
-      <div class="stage-row" id="s4"><span class="idx">05</span><span class="name">SAFETY</span><span class="status pending" id="st4">pending</span><div class="bar" id="bar4" style="width:0%"></div></div>
-      <div class="stage-row" id="s5"><span class="idx">06</span><span class="name">RESOLVE</span><span class="status pending" id="st5">pending</span><div class="bar" id="bar5" style="width:0%"></div></div>
-      <div class="stage-row" id="s6"><span class="idx">07</span><span class="name">EXPAND</span><span class="status pending" id="st6">pending</span><div class="bar" id="bar6" style="width:0%"></div></div>
+  <!-- Pipeline -->
+  <div class="panel" id="pipeline">
+    <div class="ptitle c">pipeline</div>
+    <div id="stages"></div>
+  </div>
+
+  <!-- Chat Comms -->
+  <div class="panel" id="chat">
+    <div class="ptitle p">encrypted comms</div>
+    <div class="chat-scroll" id="chatScroll"></div>
+  </div>
+
+  <!-- Inspector -->
+  <div class="panel" id="inspector">
+    <div class="ptitle y">packet</div>
+    <div class="insp-cols">
+      <div class="insp-col"><div class="ct">raw .pgn</div><pre id="rawPgn">--</pre></div>
+      <div class="insp-col"><div class="ct">expanded</div><pre id="expPgn">--</pre></div>
     </div>
   </div>
 
-  <!-- Right Top: Agent Handoff -->
-  <div class="panel">
-    <div class="panel-title green">agent handoff simulation</div>
-    <div class="handoff-vis" id="handoffVis">
-      <div class="agent-node" id="agentA" style="left:20px;top:50%;transform:translateY(-50%)">
-        <div class="icon">&#129302;</div>
-        <div class="label">AGENT A</div>
-      </div>
-      <div class="arrow-line" id="arrowA" style="left:100px;top:50%;width:80px"></div>
-      <div class="packet-dot" id="dotA"></div>
-      <div class="pidgin-node" id="pidginNode" style="left:50%;top:50%;transform:translate(-50%,-50%)">
-        <div class="icon" style="color:var(--green)">P</div>
-        <div class="label" style="color:var(--dim)">pidgin</div>
-      </div>
-      <div class="arrow-line" id="arrowB" style="right:100px;top:50%;width:80px"></div>
-      <div class="packet-dot" id="dotB"></div>
-      <div class="agent-node" id="agentB" style="right:20px;top:50%;transform:translateY(-50%)">
-        <div class="icon">&#128187;</div>
-        <div class="label">AGENT B</div>
-      </div>
-      <div id="handoffStatus" style="position:absolute;bottom:8px;font-size:10px;color:var(--dim)">idle</div>
-    </div>
-  </div>
-
-  <!-- Left Bottom: Event Log -->
-  <div class="panel">
-    <div class="panel-title purple">event log</div>
-    <div class="log" id="eventLog">
-      <div class="log-entry"><span class="ts">--:--:--</span><span class="ev">system initialized, waiting for packet...</span></div>
-    </div>
-  </div>
-
-  <!-- Right Bottom: Packet Inspector -->
-  <div class="panel">
-    <div class="panel-title yellow">packet inspector</div>
-    <div class="inspector">
-      <div class="col"><div class="col-title">.pgn input</div><pre id="pgnInput">--</pre></div>
-      <div class="col"><div class="col-title">expanded output</div><pre id="pgnOutput">--</pre></div>
-    </div>
-  </div>
-
-  <!-- Controls -->
-  <div class="controls">
-    <textarea id="packetInput" spellcheck="false">@run code.review
+  <!-- Input -->
+  <div class="panel" id="input">
+    <textarea id="pktIn" spellcheck="false">@run code.review
 wf=generic_review
 mode=draft
-in=[src/main.rs,tests/]
-out=[review_notes]
+in=[main.rs]
+out=[review]
 do=[draft,review]
 deny=[publish,send,delete,secrets]
 risk=med
 human=yes</textarea>
-    <div class="btns">
-      <button class="btn-sim" onclick="runSimulation()">SIMULATE</button>
-      <button class="btn-rst" onclick="resetAll()">RESET</button>
+    <div class="btn-row">
+      <button class="act" onclick="sim()">TRANSMIT</button>
+      <button onclick="reset()">CLR</button>
+      <button onclick="ex('safe')">safe</button>
+      <button onclick="ex('unsafe')">unsf</button>
+      <button onclick="ex('crit')">crit</button>
+      <button onclick="ex('trav')">trav</button>
     </div>
-    <div class="btns">
-      <button class="btn-ex" onclick="loadEx('safe')">safe</button>
-      <button class="btn-ex" onclick="loadEx('unsafe')">unsafe</button>
-      <button class="btn-ex" onclick="loadEx('crit')">crit</button>
-      <button class="btn-ex" onclick="loadEx('traversal')">traversal</button>
-    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="panel" id="stats">
+    <div class="ptitle b">telemetry</div>
+    <div class="stat-row"><span class="k">packets</span><span class="v" id="sPkts">0</span></div>
+    <div class="stat-row"><span class="k">passed</span><span class="v ok" id="sPass">0</span></div>
+    <div class="stat-row"><span class="k">blocked</span><span class="v no" id="sBlock">0</span></div>
+    <div class="stat-row"><span class="k">safety rules</span><span class="v" id="sRules">0</span></div>
+    <div class="stat-row"><span class="k">refs resolved</span><span class="v" id="sRes">0</span></div>
+    <div class="stat-row"><span class="k">refs failed</span><span class="v no" id="sResF">0</span></div>
+    <div class="stat-row"><span class="k">latency</span><span class="v" id="sLat">--</span></div>
+    <div class="stat-row"><span class="k">bytes recv</span><span class="v" id="sBytes">0</span></div>
+    <div class="stat-row"><span class="k">bytes sent</span><span class="v" id="sBytesR">0</span></div>
   </div>
 </div>
 
 <script>
-const $ = id => document.getElementById(id);
-let running = false, startTime = Date.now(), eventCount = 0;
+const $=id=>document.getElementById(id);
+let pkts=0,passed=0,blocks=0,rulesFired=0,refsOk=0,refsFail=0;
+let startTime=Date.now();
+let busy=false;
 
-// Examples
-const examples = {
-  safe: `@run code.review\nwf=generic_review\nmode=draft\nin=[src/main.rs,tests/]\nout=[review_notes]\n do=[draft,review]\ndeny=[publish,send,delete,secrets]\nrisk=med\nhuman=yes`,
-  unsafe: `@run publish.post\nwf=generic_draft_and_distribute\nmode=approval\nin=[draft_content]\nout=[result]\n do=[publish,send]\ndeny=[publish,send]\nrisk=med\nhuman=yes`,
-  crit: `@run deploy.prod\nwf=generic_review\nmode=approval\nin=[deploy_config]\nout=[result]\n do=[publish,delete]\ndeny=[]\nrisk=crit\nhuman=no`,
-  traversal: `@run secret.read\nwf=generic_review\nmode=draft\nin=[file:.env,file:../../../etc/passwd]\nout=[notes]\n do=[read]\ndeny=[]\nrisk=low\nhuman=no`
+const EX={
+  safe:`@run code.review\nwf=generic_review\nmode=draft\nin=[main.rs]\nout=[review]\ndo=[draft,review]\ndeny=[publish,send,delete,secrets]\nrisk=med\nhuman=yes`,
+  unsafe:`@run publish.post\nwf=generic_draft_and_distribute\nmode=approval\nin=[draft]\nout=[result]\ndo=[publish,send]\ndeny=[publish,send]\nrisk=med\nhuman=yes`,
+  crit:`@run deploy.prod\nwf=generic_review\nmode=approval\nin=[deploy_config]\nout=[result]\ndo=[publish,delete]\ndeny=[]\nrisk=crit\nhuman=no`,
+  trav:`@run secret.read\nwf=generic_review\nmode=draft\nin=[file:.env,file:../../../etc/passwd]\nout=[notes]\ndo=[read]\ndeny=[]\nrisk=low\nhuman=no`
 };
-function loadEx(k) { $('packetInput').value = examples[k]; }
+function ex(k){$('pktIn').value=EX[k]}
 
-// Timing
-setInterval(() => {
-  const s = Math.floor((Date.now()-startTime)/1000);
-  const m = Math.floor(s/60), h = Math.floor(m/60);
-  $('uptime').textContent = h>0 ? `${h}h${m%60}m` : m>0 ? `${m}m${s%60}s` : `${s}s`;
-}, 1000);
+// Timestamps
+function ts(){
+  const n=new Date();
+  return [n.getHours(),n.getMinutes(),n.getSeconds(),n.getMilliseconds()]
+    .map((v,i)=>i===3?String(v).padStart(3,'0'):String(v).padStart(2,'0'))
+    .join(':');
+}
 
-// Health check
-async function health() {
-  try {
-    const r = await fetch('/api/v1/health');
-    const d = await r.json();
-    $('host').textContent = d.data.host.split('\\').pop();
-  } catch { $('host').textContent = 'disconnected'; $('status').style.color = 'var(--red)'; }
+// Uptime
+setInterval(()=>{
+  const s=Math.floor((Date.now()-startTime)/1000);
+  const m=Math.floor(s/60),h=Math.floor(m/60);
+  $('hUp').textContent=h>0?`${h}h${m%60}m`:m>0?`${m}m${s%60}s`:`${s}s`;
+},1000);
+
+// Health
+async function health(){
+  try{const r=await fetch('/api/v1/health');const d=await r.json();$('hHost').textContent=d.data.host.split('\\').pop()}
+  catch{$('hHost').textContent='--';$('hSt').textContent='OFFLINE';$('hSt').style.color='var(--red)'}
 }
 health();
 
-// Logging
-function log(tag, msg) {
-  const now = new Date();
-  const ts = [now.getHours(),now.getMinutes(),now.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
-  const entry = document.createElement('div');
-  entry.className = 'log-entry';
-  entry.innerHTML = `<span class="ts">${ts}</span><span class="ev"><span class="tag ${tag}">${tag.toUpperCase()}</span>${msg}</span>`;
-  $('eventLog').appendChild(entry);
-  $('eventLog').scrollTop = $('eventLog').scrollHeight;
-  eventCount++;
+// Pipeline
+const STAGES=['LEXER','PARSER','SYNTAX','SCHEMA','SAFETY','RESOLVE','EXPAND'];
+function initPipeline(){
+  $('stages').innerHTML='';
+  STAGES.forEach((s,i)=>{
+    const d=document.createElement('div');
+    d.className='stg idle';
+    d.id='st'+i;
+    d.innerHTML=`<span class="n">${String(i+1).padStart(2,'0')}</span><span class="nm">${s}</span><span class="inf">idle</span>`;
+    $('stages').appendChild(d);
+  });
+}
+initPipeline();
+
+function setSt(i,state,info){
+  const el=$('st'+i);
+  el.className='stg '+state;
+  el.querySelector('.inf').textContent=info||state;
 }
 
-// Pipeline animation
-const stageNames = ['LEXER','PARSER','SYNTAX','SCHEMA','SAFETY','RESOLVE','EXPAND'];
-let stageResults = [];
-
-function setStage(i, status, pct) {
-  const row = $('s'+i);
-  const st = $('st'+i);
-  const bar = $('bar'+i);
-  row.className = 'stage-row ' + (status==='running'?'active':status==='pass'?'done':status==='fail'?'fail':'');
-  st.className = 'status ' + status;
-  st.textContent = status;
-  bar.style.width = (pct||0) + '%';
+// Chat
+function chat(type,src,cls,msg){
+  const d=document.createElement('div');
+  d.className='msg';
+  d.innerHTML=`<span class="ts">${ts()}</span><span class="src ${cls}">${src}</span><span class="body">${msg}</span>`;
+  $('chatScroll').appendChild(d);
+  $('chatScroll').scrollTop=$('chatScroll').scrollHeight;
+}
+function chatEnc(src,cls,hex,plain){
+  const d=document.createElement('div');
+  d.className='msg';
+  d.innerHTML=`<span class="ts">${ts()}</span><span class="src ${cls}">${src}</span><span class="body"><span class="enc">${hex}</span> <span class="key">&gt;</span> <span class="pkt">${plain}</span></span>`;
+  $('chatScroll').appendChild(d);
+  $('chatScroll').scrollTop=$('chatScroll').scrollHeight;
+}
+function chatHdr(msg){
+  const d=document.createElement('div');
+  d.className='hdr-line';
+  d.textContent='─'.repeat(20)+' '+msg+' ─'.repeat(20);
+  $('chatScroll').appendChild(d);
+  $('chatScroll').scrollTop=$('chatScroll').scrollHeight;
 }
 
-function resetPipeline() {
-  for(let i=0;i<7;i++){setStage(i,'pending',0); stageResults[i]=null;}
+// Stats
+function upStats(){
+  $('sPkts').textContent=pkts;
+  $('sPass').textContent=passed;
+  $('sBlock').textContent=blocks;
+  $('sRules').textContent=rulesFired;
+  $('sRes').textContent=refsOk;
+  $('sResF').textContent=refsFail;
+  $('hPkts').textContent=pkts;
+  $('hBlocks').textContent=blocks;
 }
 
-// Handoff animation
-function resetHandoff() {
-  $('agentA').className='agent-node'; $('agentB').className='agent-node';
-  $('pidginNode').className='pidgin-node';
-  $('arrowA').className='arrow-line'; $('arrowB').className='arrow-line';
-  $('dotA').className='packet-dot'; $('dotB').className='packet-dot';
-  $('handoffStatus').textContent='idle';
+// Hex generator
+function hexStr(s){return[...s].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')}
+
+async function api(ep,body){
+  try{const r=await fetch('/api/v1/'+ep,{method:'POST',headers:{'Content-Type':'text/plain'},body});return await r.json()}
+  catch(e){return{ok:false,error:e.message}}
 }
 
-async function animateHandoff(phase) {
-  if(phase==='send') {
-    $('agentA').classList.add('active');
-    $('handoffStatus').textContent='agent A encoding packet...';
-    log('agent','Agent A encoding .pgn packet');
-    await delay(400);
-    $('arrowA').classList.add('active');
-    $('dotA').style.left='100px'; $('dotA').style.top='50%';
-    $('dotA').classList.add('show');
-    $('handoffStatus').textContent='sending packet to pidgin...';
-    log('handoff','Agent A -> Pidgin: transmitting packet');
-    for(let x=100;x<=180;x+=4){$('dotA').style.left=x+'px';await delay(10);}
-    $('dotA').classList.remove('show');
-  } else if(phase==='process') {
-    $('pidginNode').classList.add('active');
-    $('handoffStatus').textContent='pidgin processing...';
-    log('pidgin','Pidgin pipeline: validate -> safety -> resolve -> expand');
-    await delay(300);
-  } else if(phase==='receive') {
-    $('arrowB').classList.add('active');
-    $('dotB').style.right='100px'; $('dotB').style.top='50%';
-    $('dotB').classList.add('show');
-    $('handoffStatus').textContent='delivering to agent B...';
-    log('handoff','Pidgin -> Agent B: delivering expanded packet');
-    for(let x=100;x<=180;x+=4){$('dotB').style.right=x+'px';await delay(10);}
-    $('dotB').classList.remove('show');
-    $('agentB').classList.add('active');
-    $('handoffStatus').textContent='agent B received expanded packet';
-    log('agent','Agent B received expanded YAML, executing workflow');
+async function sim(){
+  if(busy)return;
+  busy=true;
+  const pgn=$('pktIn').value;
+  pkts++;
+  upStats();
+
+  const t0=performance.now();
+
+  chatHdr('SESSION START');
+  chat('sys','SYS','sys',`<span class="addr">0x${Math.random().toString(16).slice(2,10)}</span> new packet incoming`);
+
+  // Input echo
+  const lines=pgn.split('\n');
+  chatEnc('AGENT','ag',hexStr(lines[0]),lines[0]);
+  await delay(80);
+
+  // Pipeline
+  for(let i=0;i<7;i++){
+    setSt(i,'run','processing');
+    await delay(100+Math.random()*150);
   }
-}
-
-// Simulate
-async function runSimulation() {
-  if(running) return;
-  running = true;
-  resetPipeline();
-  resetHandoff();
-
-  const pgn = $('packetInput').value;
-  $('pgnInput').textContent = pgn;
-  $('pgnOutput').textContent = '--';
-
-  log('system','Simulation started');
-  log('parse','Input: ' + pgn.split('\n')[0]);
-
-  // Start handoff animation
-  animateHandoff('send');
-
-  // Run actual API calls with staged animation
-  const stages = [
-    {name:'parse', api:'parse', delay:300},
-    {name:'validate', api:'validate', delay:400},
-    {name:'check', api:'check', delay:600},
-    {name:'expand', api:'expand', delay:400},
-    {name:'run', api:'run', delay:500}
-  ];
-
-  // Stage-by-stage animation
-  for(let i=0;i<7;i++) {
-    setStage(i,'running',0);
-    const dur = 150 + Math.random()*200;
-    for(let p=0;p<=100;p+=5){setStage(i,'running',p);await delay(dur/20);}
-  }
-
-  // Call actual APIs
-  let parseResult, validateResult, checkResult, runResult;
 
   // Parse
-  setStage(0,'running',50);
-  parseResult = await apiCall('parse', pgn);
-  setStage(0, parseResult.ok?'pass':'fail', 100);
-  log('parse', parseResult.ok ? `directive=${parseResult.data.directive}, run_id=${parseResult.data.run_id}` : `ERROR: ${parseResult.error}`);
-  await delay(200);
+  const pr=await api('parse',pgn);
+  if(pr.ok){
+    setSt(0,'pass',`dir=${pr.data.directive}`);
+    setSt(1,'pass',`id=${pr.data.run_id.slice(0,16)}`);
+    chat('sys','SRV','srv',`<span class="ok">PARSE_OK</span> directive=<span class="pkt">${pr.data.directive}</span> run_id=<span class="addr">${pr.data.run_id}</span>`);
+  }else{
+    setSt(0,'fail','err');setSt(1,'fail','err');
+    chat('sys','ERR','err',`<span class="no">PARSE_FAIL</span> ${pr.error}`);
+    blocks++;upStats();busy=false;return;
+  }
+  await delay(60);
 
   // Validate
-  setStage(1,'running',50);
-  setStage(2,'running',50);
-  validateResult = await apiCall('validate', pgn);
-  setStage(1, validateResult.ok?'pass':'fail', 100);
-  setStage(2, validateResult.ok?'pass':'fail', 100);
-  const valCount = validateResult.ok ? validateResult.data.length : 0;
-  log('syntax', valCount===0 ? 'all required fields present' : `${valCount} validation errors`);
-  await delay(200);
+  const vr=await api('validate',pgn);
+  if(vr.ok&&vr.data.length===0){
+    setSt(2,'pass','0 errors');
+    chat('sys','SRV','srv',`<span class="ok">VALIDATE_OK</span> schema=PASS fields=9`);
+  }else{
+    setSt(2,'fail',`${vr.data.length} err`);
+    chat('sys','SRV','srv',`<span class="no">VALIDATE_FAIL</span> ${vr.data.length} errors`);
+    vr.data.forEach(e=>chat('sys','SRV','srv',`  <span class="no">${e.code}</span> ${e.message}`));
+    blocks++;upStats();busy=false;return;
+  }
+  await delay(60);
 
   // Schema
-  setStage(3,'running',50);
-  setStage(3, validateResult.ok?'pass':'fail', 100);
-  log('schema', validateResult.ok ? 'workflow, mode, risk all valid' : 'schema check failed');
-  await delay(200);
+  setSt(3,'pass','ok');
+  chat('sys','SRV','srv',`<span class="ok">SCHEMA_OK</span> wf=<span class="key">generic_review</span> risk=<span class="warn">${(pgn.match(/risk=(\w+)/)||[])[1]||'?'}</span> human=<span class="pkt">${(pgn.match(/human=(\w+)/)||[])[1]||'?'}</span>`);
+  await delay(60);
 
   // Check (safety + resolve)
-  setStage(4,'running',50);
-  checkResult = await apiCall('check', pgn);
-  setStage(4, checkResult.ok?'pass':'fail', 100);
-  if(checkResult.ok) {
-    const s = checkResult.data.safety;
-    log('safety', s.blocked ? `BLOCKED: ${s.fired_rules.join(', ')}` : `PASS: ${s.fired_rules.length} rules fired`);
-    if(s.human_required) log('safety','human approval required');
-  } else {
-    log('error', `Safety check failed: ${checkResult.error}`);
-  }
-  await delay(200);
+  const cr=await api('check',pgn);
+  if(cr.ok){
+    const s=cr.data.safety;
+    const res=cr.data.resolution;
+    if(s.blocked){
+      setSt(4,'fail',`BLOCKED`);
+      chat('sys','SRV','srv',`<span class="no">SAFETY_BLOCK</span> rules fired: ${s.fired_rules.map(r=>`<span class="key">${r}</span>`).join(', ')}`);
+      blocks++;rulesFired+=s.fired_rules.length;
+    }else{
+      setSt(4,'pass',`${s.fired_rules.length} rules`);
+      chat('sys','SRV','srv',`<span class="ok">SAFETY_PASS</span> ${s.fired_rules.length} rules evaluated`);
+      rulesFired+=s.fired_rules.length;
+    }
+    if(s.human_required) chat('sys','SRV','srv',`<span class="warn">HUMAN_REQUIRED</span> manual approval gate`);
 
-  // Resolve
-  setStage(5,'running',50);
-  if(checkResult.ok) {
-    const resolved = checkResult.data.resolution.filter(r=>r.status==='RESOLVED').length;
-    const unresolved = checkResult.data.resolution.filter(r=>r.status!=='RESOLVED').length;
-    setStage(5, unresolved===0?'pass':'fail', 100);
-    log('resolve', `${resolved} resolved, ${unresolved} unresolved`);
-    checkResult.data.resolution.forEach(r => {
-      if(r.status!=='RESOLVED') log('resolve', `  ${r.original} -> ${r.status}`);
-    });
+    const ok=res.filter(r=>r.status==='RESOLVED');
+    const bad=res.filter(r=>r.status!=='RESOLVED');
+    refsOk+=ok.length;refsFail+=bad.length;
+    setSt(5,bad.length===0?'pass':'fail',`${ok.length}r/${bad.length}u`);
+    if(ok.length>0) chat('sys','SRV','srv',`<span class="ok">RESOLVED</span> ${ok.map(r=>`<span class="addr">${r.original}</span>`).join(', ')}`);
+    bad.forEach(r=>chat('sys','SRV','srv',`<span class="no">UNRESOLVED</span> <span class="addr">${r.original}</span> status=${r.status}`));
+  }else{
+    setSt(4,'fail','err');setSt(5,'fail','err');
+    chat('sys','ERR','err',`<span class="no">CHECK_FAIL</span> ${cr.error}`);
+    blocks++;upStats();busy=false;return;
   }
-  await delay(200);
+  await delay(60);
 
   // Expand
-  setStage(6,'running',50);
-  runResult = await apiCall('run', pgn);
-  setStage(6, runResult.ok?'pass':'fail', 100);
-  if(runResult.ok) {
-    $('pgnOutput').textContent = runResult.data.yaml;
-    log('expand', `expanded to YAML, route: ${runResult.data.route}`);
-    log('route', `recommended executor: ${runResult.data.safety.blocked ? 'BLOCKED' : 'proceed'}`);
-  } else {
-    log('error', `Expand failed: ${runResult.error}`);
-    $('pgnOutput').textContent = `ERROR: ${runResult.error}`;
+  const er=await api('expand',pgn);
+  if(er.ok){
+    setSt(6,'pass','done');
+    $('rawPgn').textContent=pgn;
+    $('expPgn').textContent=er.data.yaml;
+    chat('sys','SRV','srv',`<span class="ok">EXPAND_OK</span> route=<span class="addr">${er.data.route.match(/executor: (\w+)/)?.[1]||'?'}</span> ttl=24h`);
+    chatEnc('SRV','srv',hexStr(er.data.route.slice(0,40)),er.data.route.slice(0,60)+'...');
+    passed++;
+  }else{
+    setSt(6,'fail','err');
+    chat('sys','ERR','err',`<span class="no">EXPAND_FAIL</span> ${er.error}`);
+    blocks++;
   }
 
-  // Complete handoff
-  animateHandoff('process');
-  await delay(600);
-  animateHandoff('receive');
+  const lat=(performance.now()-t0).toFixed(0);
+  $('sLat').textContent=lat+'ms';
+  $('sBytes').textContent=(pgn.length*2)+'b';
+  $('sBytesR').textContent=er.ok?(er.data.yaml.length*2)+'b':'0b';
 
-  log('system', `Simulation complete. ${eventCount} events logged.`);
-  running = false;
+  chatHdr('SESSION END');
+  upStats();
+  busy=false;
 }
 
-async function apiCall(endpoint, body) {
-  try {
-    const r = await fetch('/api/v1/' + endpoint, {
-      method: 'POST', headers: {'Content-Type':'text/plain'}, body
-    });
-    return await r.json();
-  } catch(e) { return {ok:false, error:e.message}; }
+function reset(){
+  busy=false;
+  initPipeline();
+  $('chatScroll').innerHTML='';
+  $('rawPgn').textContent='--';
+  $('expPgn').textContent='--';
+  pkts=passed=blocks=rulesFired=refsOk=refsFail=0;
+  upStats();
+  $('sLat').textContent='--';
+  $('sBytes').textContent='0';
+  $('sBytesR').textContent='0';
+  chat('sys','SYS','sys','session cleared');
 }
 
-function delay(ms) { return new Promise(r=>setTimeout(r,ms)); }
-
-function resetAll() {
-  running = false;
-  resetPipeline();
-  resetHandoff();
-  $('pgnInput').textContent='--';
-  $('pgnOutput').textContent='--';
-  $('eventLog').innerHTML='<div class="log-entry"><span class="ts">--:--:--</span><span class="ev">system reset, waiting for packet...</span></div>';
-  eventCount = 0;
-}
+function delay(ms){return new Promise(r=>setTimeout(r,ms))}
 </script>
 </body>
 </html>
