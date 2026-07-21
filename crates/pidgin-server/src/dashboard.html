@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pidgin Server</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
+  .header { padding: 24px 32px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 16px; }
+  .header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  .header .badge { background: #1a3a1a; color: #4ade80; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px; }
+  .section { margin-bottom: 32px; }
+  .section-title { font-size: 14px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+  textarea { width: 100%; height: 200px; background: #111; border: 1px solid #222; border-radius: 8px; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; padding: 16px; resize: vertical; outline: none; }
+  textarea:focus { border-color: #333; }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  button { padding: 10px 20px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-secondary { background: #1a1a1a; color: #ccc; border: 1px solid #333; }
+  .btn-secondary:hover { background: #222; }
+  .result { margin-top: 16px; background: #111; border: 1px solid #222; border-radius: 8px; padding: 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow-y: auto; display: none; }
+  .result.show { display: block; }
+  .result.ok { border-color: #1a3a1a; }
+  .result.err { border-color: #3a1a1a; }
+  .status-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 32px; background: #111; border-top: 1px solid #1a1a1a; font-size: 12px; color: #666; display: flex; justify-content: space-between; }
+  .endpoint-tag { display: inline-block; background: #1a1a2a; color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>pgn serve</h1>
+  <span class="badge" id="status">connecting...</span>
+</div>
+
+<div class="container">
+  <div class="section">
+    <div class="section-title">Packet Input</div>
+    <textarea id="packet" spellcheck="false">@run example.task
+wf=generic_review
+mode=draft
+in=[primary_subject,source_refs]
+out=[review_notes]
+do=[draft,review]
+deny=[publish,send,delete,secrets]
+risk=med
+human=yes</textarea>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Actions</div>
+    <div class="actions">
+      <button class="btn-primary" onclick="call('parse')">Parse</button>
+      <button class="btn-primary" onclick="call('validate')">Validate</button>
+      <button class="btn-primary" onclick="call('check')">Check</button>
+      <button class="btn-primary" onclick="call('expand')">Expand</button>
+      <button class="btn-primary" onclick="call('run')">Run</button>
+      <button class="btn-secondary" onclick="clearResult()">Clear</button>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Result</div>
+    <div class="result" id="result"></div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span id="endpoint"></span>
+  <span id="timing"></span>
+</div>
+
+<script>
+  const resultEl = document.getElementById('result');
+  const endpointEl = document.getElementById('endpoint');
+  const timingEl = document.getElementById('timing');
+  const statusEl = document.getElementById('status');
+
+  async function healthCheck() {
+    try {
+      const r = await fetch('/api/v1/health');
+      const d = await r.json();
+      statusEl.textContent = 'v' + d.data.version;
+      statusEl.style.background = '#1a3a1a';
+      statusEl.style.color = '#4ade80';
+    } catch {
+      statusEl.textContent = 'offline';
+      statusEl.style.background = '#3a1a1a';
+      statusEl.style.color = '#f87171';
+    }
+  }
+  healthCheck();
+  setInterval(healthCheck, 10000);
+
+  async function call(endpoint) {
+    const body = document.getElementById('packet').value;
+    endpointEl.textContent = 'POST /api/v1/' + endpoint;
+    resultEl.className = 'result show';
+    resultEl.textContent = '...';
+    const t0 = performance.now();
+    try {
+      const r = await fetch('/api/v1/' + endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: body
+      });
+      const d = await r.json();
+      const ms = Math.round(performance.now() - t0);
+      timingEl.textContent = ms + 'ms';
+      resultEl.className = 'result show ' + (d.ok ? 'ok' : 'err');
+      resultEl.textContent = JSON.stringify(d, null, 2);
+    } catch (e) {
+      resultEl.className = 'result show err';
+      resultEl.textContent = 'Error: ' + e.message;
+    }
+  }
+
+  function clearResult() {
+    resultEl.className = 'result';
+    resultEl.textContent = '';
+    endpointEl.textContent = '';
+    timingEl.textContent = '';
+  }
+</script>
+</body>
+</html>

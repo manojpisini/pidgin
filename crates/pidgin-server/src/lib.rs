@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use axum::extract::{Json, State};
 use axum::http::StatusCode;
+use axum::response::Html;
 use axum::routing::{get, post};
 use axum::Router;
 use serde::Serialize;
@@ -191,6 +192,10 @@ async fn health(State(_state): State<Arc<AppState>>) -> Json<ApiResponse<HealthD
         version: env!("CARGO_PKG_VERSION").to_string(),
         host: _state.host_root.display().to_string(),
     }))
+}
+
+async fn dashboard() -> Html<&'static str> {
+    Html(include_str!("dashboard.html"))
 }
 
 async fn parse_handler(
@@ -509,6 +514,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .allow_headers(Any);
 
     Router::new()
+        .route("/", get(dashboard))
         .route("/api/v1/health", get(health))
         .route("/api/v1/parse", post(parse_handler))
         .route("/api/v1/validate", post(validate_handler))
