@@ -3,43 +3,276 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Pidgin Server</title>
+<title>Pidgin — Agent Handoff Protocol</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height: 100vh; }
-  .header { padding: 24px 32px; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; gap: 16px; }
-  .header h1 { font-size: 20px; font-weight: 600; color: #fff; }
-  .header .badge { background: #1a3a1a; color: #4ade80; padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-  .container { max-width: 960px; margin: 0 auto; padding: 32px; }
-  .section { margin-bottom: 32px; }
-  .section-title { font-size: 14px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
-  textarea { width: 100%; height: 200px; background: #111; border: 1px solid #222; border-radius: 8px; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; padding: 16px; resize: vertical; outline: none; }
-  textarea:focus { border-color: #333; }
-  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-  button { padding: 10px 20px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
-  .btn-primary { background: #2563eb; color: #fff; }
-  .btn-primary:hover { background: #1d4ed8; }
-  .btn-secondary { background: #1a1a1a; color: #ccc; border: 1px solid #333; }
-  .btn-secondary:hover { background: #222; }
-  .result { margin-top: 16px; background: #111; border: 1px solid #222; border-radius: 8px; padding: 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; white-space: pre-wrap; word-break: break-word; max-height: 400px; overflow-y: auto; display: none; }
-  .result.show { display: block; }
-  .result.ok { border-color: #1a3a1a; }
-  .result.err { border-color: #3a1a1a; }
-  .status-bar { position: fixed; bottom: 0; left: 0; right: 0; padding: 8px 32px; background: #111; border-top: 1px solid #1a1a1a; font-size: 12px; color: #666; display: flex; justify-content: space-between; }
-  .endpoint-tag { display: inline-block; background: #1a1a2a; color: #60a5fa; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; margin-right: 8px; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #0a0a0a; color: #d4d4d4; line-height: 1.6; }
+  a { color: #60a5fa; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Nav */
+  nav { position: sticky; top: 0; z-index: 100; padding: 16px 32px; background: rgba(10,10,10,0.85); backdrop-filter: blur(12px); border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; justify-content: space-between; }
+  nav .brand { display: flex; align-items: center; gap: 12px; }
+  nav .brand h1 { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: -0.5px; }
+  nav .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  nav .links { display: flex; gap: 24px; font-size: 13px; }
+  nav .links a { color: #888; transition: color 0.15s; }
+  nav .links a:hover { color: #fff; text-decoration: none; }
+  nav .version { background: #1a1a2a; color: #60a5fa; padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+
+  /* Hero */
+  .hero { padding: 80px 32px 60px; text-align: center; max-width: 720px; margin: 0 auto; }
+  .hero h2 { font-size: 42px; font-weight: 700; color: #fff; letter-spacing: -1px; margin-bottom: 16px; }
+  .hero p { font-size: 17px; color: #888; max-width: 540px; margin: 0 auto 32px; }
+  .hero .packets { display: inline-flex; gap: 8px; background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 12px 20px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; color: #666; margin-bottom: 32px; }
+  .hero .packets span { color: #4ade80; }
+  .hero .cta { display: flex; gap: 12px; justify-content: center; }
+  .hero .cta a { padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; transition: all 0.15s; }
+  .cta .primary { background: #2563eb; color: #fff; }
+  .cta .primary:hover { background: #1d4ed8; text-decoration: none; }
+  .cta .secondary { background: #1a1a1a; color: #ccc; border: 1px solid #333; }
+  .cta .secondary:hover { background: #222; text-decoration: none; }
+
+  /* Sections */
+  .section { max-width: 960px; margin: 0 auto; padding: 60px 32px; }
+  .section-label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .section-title { font-size: 28px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+  .section-desc { font-size: 15px; color: #777; max-width: 560px; margin-bottom: 40px; }
+
+  /* Pipeline */
+  .pipeline { display: flex; align-items: center; gap: 0; overflow-x: auto; padding: 20px 0; }
+  .pipeline .stage { flex-shrink: 0; background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 16px 20px; text-align: center; min-width: 120px; transition: border-color 0.2s; }
+  .pipeline .stage:hover { border-color: #333; }
+  .pipeline .stage .name { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .pipeline .stage .desc { font-size: 11px; color: #666; }
+  .pipeline .arrow { flex-shrink: 0; color: #333; font-size: 18px; padding: 0 4px; }
+
+  /* Feature Grid */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .card { background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 24px; transition: border-color 0.2s; }
+  .card:hover { border-color: #333; }
+  .card .icon { font-size: 24px; margin-bottom: 12px; }
+  .card h3 { font-size: 15px; font-weight: 600; color: #fff; margin-bottom: 8px; }
+  .card p { font-size: 13px; color: #777; line-height: 1.5; }
+
+  /* Agents */
+  .agents { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .agent { background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 20px; display: flex; align-items: center; gap: 14px; transition: border-color 0.2s; }
+  .agent:hover { border-color: #333; }
+  .agent .avatar { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0; }
+  .agent .info h4 { font-size: 14px; font-weight: 600; color: #fff; }
+  .agent .info p { font-size: 12px; color: #666; }
+
+  /* Safety */
+  .rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+  .rule { background: #111; border: 1px solid #1a1a1a; border-radius: 8px; padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px; }
+  .rule .tag { background: #1a2a1a; color: #4ade80; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; font-family: monospace; flex-shrink: 0; margin-top: 2px; }
+  .rule .text { font-size: 13px; color: #aaa; }
+
+  /* Grammar */
+  .grammar { background: #111; border: 1px solid #1a1a1a; border-radius: 10px; padding: 24px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; line-height: 1.8; overflow-x: auto; }
+  .grammar .kw { color: #c084fc; }
+  .grammar .field { color: #60a5fa; }
+  .grammar .val { color: #4ade80; }
+  .grammar .comment { color: #555; }
+
+  /* API Explorer */
+  .explorer { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 768px) { .explorer { grid-template-columns: 1fr; } }
+  .explorer textarea { width: 100%; height: 320px; background: #111; border: 1px solid #1a1a1a; border-radius: 8px; color: #e0e0e0; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; padding: 16px; resize: vertical; outline: none; }
+  .explorer textarea:focus { border-color: #333; }
+  .explorer .result-panel { background: #111; border: 1px solid #1a1a1a; border-radius: 8px; padding: 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-word; overflow-y: auto; max-height: 356px; color: #aaa; }
+  .explorer .btn-row { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+  .explorer button { padding: 8px 16px; border: none; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-run { background: #2563eb; color: #fff; }
+  .btn-run:hover { background: #1d4ed8; }
+  .btn-sec { background: #1a1a1a; color: #999; border: 1px solid #2a2a2a; }
+  .btn-sec:hover { background: #222; color: #ccc; }
+  .timing { font-size: 11px; color: #555; margin-top: 8px; }
+
+  /* CLI */
+  .cli-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 8px; }
+  .cli-item { background: #111; border: 1px solid #1a1a1a; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; }
+  .cli-item code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; color: #4ade80; flex-shrink: 0; }
+  .cli-item span { font-size: 12px; color: #666; }
+
+  /* Footer */
+  footer { border-top: 1px solid #1a1a1a; padding: 32px; text-align: center; font-size: 12px; color: #444; margin-top: 40px; }
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1>pgn serve</h1>
-  <span class="badge" id="status">connecting...</span>
+<nav>
+  <div class="brand">
+    <div class="dot"></div>
+    <h1>pidgin</h1>
+  </div>
+  <div class="links">
+    <a href="#pipeline">Pipeline</a>
+    <a href="#features">Features</a>
+    <a href="#agents">Agents</a>
+    <a href="#safety">Safety</a>
+    <a href="#grammar">Grammar</a>
+    <a href="#explorer">Explorer</a>
+    <a href="#cli">CLI</a>
+  </div>
+  <span class="version" id="version">v...</span>
+</nav>
+
+<!-- Hero -->
+<div class="hero">
+  <div class="packets"><span>@run</span> agent.handoff &nbsp; wf=review &nbsp; risk=med &nbsp; human=yes</div>
+  <h2>Agent Handoff Protocol</h2>
+  <p>Pidgin is a compact, local-first protocol for structured handoffs between AI agents. Nine lines of key-value text, validated through a deterministic safety pipeline.</p>
+  <div class="cta">
+    <a href="#explorer" class="primary">Try it live</a>
+    <a href="https://github.com/manojpisini/pidgin" class="secondary" target="_blank">GitHub</a>
+  </div>
 </div>
 
-<div class="container">
-  <div class="section">
-    <div class="section-title">Packet Input</div>
-    <textarea id="packet" spellcheck="false">@run example.task
+<!-- Pipeline -->
+<div class="section" id="pipeline">
+  <div class="section-label">Pipeline</div>
+  <div class="section-title">Every packet flows through 7 stages</div>
+  <div class="section-desc">Deterministic. No LLM calls. No network. Same input always produces same output.</div>
+  <div class="pipeline">
+    <div class="stage"><div class="name">Lexer</div><div class="desc">Tokenize</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage"><div class="name">Parser</div><div class="desc">Typed AST</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage"><div class="name">Syntax</div><div class="desc">Required fields</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage"><div class="name">Schema</div><div class="desc">Registry check</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage" style="border-color:#2a3a2a"><div class="name">Safety</div><div class="desc">9 rules (SG-1..9)</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage"><div class="name">Resolve</div><div class="desc">Refs &rarr; paths</div></div>
+    <div class="arrow">&rarr;</div>
+    <div class="stage"><div class="name">Expand</div><div class="desc">Executable YAML</div></div>
+  </div>
+</div>
+
+<!-- Features -->
+<div class="section" id="features">
+  <div class="section-label">Capabilities</div>
+  <div class="section-title">What Pidgin does</div>
+  <div class="grid">
+    <div class="card">
+      <div class="icon">&#9997;</div>
+      <h3>9-Line Packets</h3>
+      <p>Directive, workflow, mode, inputs, outputs, actions, deny list, risk level, human flag. Compact enough to paste in a chat message.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128737;</div>
+      <h3>Safety Gate</h3>
+      <p>9 rules enforce at runtime: contradiction detection, human approval for dangerous actions, private path protection, critical-risk dual-packet approval.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128279;</div>
+      <h3>Reference Resolution</h3>
+      <p>Short refs like <code>file:src/main.rs</code> or <code>ep:UNIT012</code> resolve to real paths with canonicalization, containment checks, and symlink traversal protection.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128640;</div>
+      <h3>Executable Expansion</h3>
+      <p>Packets expand to fully-specified YAML with resolved paths, safety metadata, risk assessment, recommended executor, and fallback chains.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128200;</div>
+      <h3>Token Estimation</h3>
+      <p>Estimate token cost of packets vs verbose natural language. Compare a 9-line .pgn against the equivalent paragraph of text.</p>
+    </div>
+    <div class="card">
+      <div class="icon">&#128274;</div>
+      <h3>Fail Closed</h3>
+      <p>Unknown workflow &rarr; blocked. Missing input &rarr; blocked. Ambiguous ref &rarr; blocked. If uncertain, the protocol says no.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Agents -->
+<div class="section" id="agents">
+  <div class="section-label">Integrations</div>
+  <div class="section-title">Works with your agents</div>
+  <div class="section-desc">Pidgin sits between any two agents as a validated handoff layer. No changes to your agent framework required.</div>
+  <div class="agents">
+    <div class="agent">
+      <div class="avatar" style="background:#2563eb">L</div>
+      <div class="info"><h4>LangGraph</h4><p>Pidgin node between graph steps</p></div>
+    </div>
+    <div class="agent">
+      <div class="avatar" style="background:#7c3aed">C</div>
+      <div class="info"><h4>CrewAI</h4><p>Validate agent task handoffs</p></div>
+    </div>
+    <div class="agent">
+      <div class="avatar" style="background:#059669">M</div>
+      <div class="info"><h4>MCP</h4><p>Pidgin as an MCP server tool</p></div>
+    </div>
+    <div class="agent">
+      <div class="avatar" style="background:#d97706">A</div>
+      <div class="info"><h4>A2A</h4><p>Expanded packets as A2A payloads</p></div>
+    </div>
+    <div class="agent">
+      <div class="avatar" style="background:#dc2626">P</div>
+      <div class="info"><h4>Python</h4><p>PyO3 native bindings (coming soon)</p></div>
+    </div>
+    <div class="agent">
+      <div class="avatar" style="background:#4338ca">H</div>
+      <div class="info"><h4>HTTP</h4><p>This server &mdash; POST .pgn text, get JSON</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- Safety -->
+<div class="section" id="safety">
+  <div class="section-label">Safety Rules</div>
+  <div class="section-title">9 rules. Fail closed.</div>
+  <div class="rules">
+    <div class="rule"><span class="tag">SG-1</span><span class="text">Action in both <code>do</code> and <code>deny</code> &rarr; blocked</span></div>
+    <div class="rule"><span class="tag">SG-2</span><span class="text">Human-gated action without <code>human=yes</code> &rarr; blocked</span></div>
+    <div class="rule"><span class="tag">SG-3</span><span class="text">High/critical risk forces <code>human=yes</code>, cannot override</span></div>
+    <div class="rule"><span class="tag">SG-4</span><span class="text">References to private paths (.env, *.key, .git/) &rarr; blocked</span></div>
+    <div class="rule"><span class="tag">SG-5</span><span class="text">Unknown workflow not in registry &rarr; blocked</span></div>
+    <div class="rule"><span class="tag">SG-6</span><span class="text">Invalid mode for the workflow &rarr; blocked</span></div>
+    <div class="rule"><span class="tag">SG-7</span><span class="text"><code>note</code> field is never parsed for instructions</span></div>
+    <div class="rule"><span class="tag">SG-8</span><span class="text">Unresolved required inputs &rarr; expansion blocked</span></div>
+    <div class="rule"><span class="tag">SG-9</span><span class="text">Critical risk requires <code>@approval</code> packet</span></div>
+  </div>
+</div>
+
+<!-- Grammar -->
+<div class="section" id="grammar">
+  <div class="section-label">Protocol</div>
+  <div class="section-title">Packet grammar</div>
+  <div class="grammar">
+<span class="comment"># Header — directive + run ID</span>
+<span class="kw">@run</span> <span class="val">agent.task_name</span>
+
+<span class="comment"># Key-value fields</span>
+<span class="field">wf</span>=<span class="val">generic_review</span>
+<span class="field">mode</span>=<span class="val">draft</span>
+<span class="field">in</span>=[<span class="val">primary_subject, source_refs</span>]
+<span class="field">out</span>=[<span class="val">review_notes</span>]
+<span class="field">do</span>=[<span class="val">draft, review</span>]
+<span class="field">deny</span>=[<span class="val">publish, send, delete, secrets</span>]
+<span class="field">risk</span>=<span class="val">med</span>
+<span class="field">human</span>=<span class="val">yes</span>
+
+<span class="comment"># Directives: @run, @result, @approval, @context</span>
+<span class="comment"># References: file:path, ep:id, workflow:name, or bare aliases</span>
+<span class="comment"># Risk: low | med | high | crit</span>
+  </div>
+</div>
+
+<!-- API Explorer -->
+<div class="section" id="explorer">
+  <div class="section-label">API Explorer</div>
+  <div class="section-title">Try it live</div>
+  <div class="section-desc">Paste a .pgn packet and hit any endpoint. The server runs the full pipeline.</div>
+  <div class="explorer">
+    <div>
+      <textarea id="packet" spellcheck="false">@run example.task
 wf=generic_review
 mode=draft
 in=[primary_subject,source_refs]
@@ -48,58 +281,100 @@ do=[draft,review]
 deny=[publish,send,delete,secrets]
 risk=med
 human=yes</textarea>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Actions</div>
-    <div class="actions">
-      <button class="btn-primary" onclick="call('parse')">Parse</button>
-      <button class="btn-primary" onclick="call('validate')">Validate</button>
-      <button class="btn-primary" onclick="call('check')">Check</button>
-      <button class="btn-primary" onclick="call('expand')">Expand</button>
-      <button class="btn-primary" onclick="call('run')">Run</button>
-      <button class="btn-secondary" onclick="clearResult()">Clear</button>
+      <div class="btn-row">
+        <button class="btn-run" onclick="call('parse')">Parse</button>
+        <button class="btn-run" onclick="call('validate')">Validate</button>
+        <button class="btn-run" onclick="call('check')">Check</button>
+        <button class="btn-run" onclick="call('expand')">Expand</button>
+        <button class="btn-run" onclick="call('run')">Run</button>
+        <button class="btn-sec" onclick="loadExample('safe')">Example: Safe</button>
+        <button class="btn-sec" onclick="loadExample('unsafe')">Example: Unsafe</button>
+        <button class="btn-sec" onclick="loadExample('crit')">Example: Critical</button>
+      </div>
     </div>
+    <div class="result-panel" id="result">Click an endpoint to see the response.</div>
   </div>
+  <div class="timing" id="timing"></div>
+</div>
 
-  <div class="section">
-    <div class="section-title">Result</div>
-    <div class="result" id="result"></div>
+<!-- CLI -->
+<div class="section" id="cli">
+  <div class="section-label">CLI</div>
+  <div class="section-title">All commands</div>
+  <div class="cli-grid">
+    <div class="cli-item"><code>pgn parse</code><span>Parse a packet, print AST</span></div>
+    <div class="cli-item"><code>pgn validate</code><span>Syntax + schema validation</span></div>
+    <div class="cli-item"><code>pgn check</code><span>Validate &rarr; safety &rarr; resolve</span></div>
+    <div class="cli-item"><code>pgn resolve</code><span>Resolve all short references</span></div>
+    <div class="cli-item"><code>pgn expand</code><span>Expand to executable YAML</span></div>
+    <div class="cli-item"><code>pgn run</code><span>Full pipeline end-to-end</span></div>
+    <div class="cli-item"><code>pgn measure</code><span>Estimate token cost</span></div>
+    <div class="cli-item"><code>pgn compare</code><span>Compare .pgn vs verbose text</span></div>
+    <div class="cli-item"><code>pgn context-plan</code><span>Build retrieval plan</span></div>
+    <div class="cli-item"><code>pgn serve</code><span>Start this HTTP server</span></div>
+    <div class="cli-item"><code>pgn init</code><span>Scaffold .pidgin/ config</span></div>
+    <div class="cli-item"><code>pgn doctor</code><span>Check host configuration</span></div>
+    <div class="cli-item"><code>pgn docs</code><span>Print protocol spec</span></div>
   </div>
 </div>
 
-<div class="status-bar">
-  <span id="endpoint"></span>
-  <span id="timing"></span>
-</div>
+<footer>
+  pidgin v<span id="footerv">?</span> &middot; agent handoff protocol &middot; <a href="https://github.com/manojpisini/pidgin" target="_blank">github.com/manojpisini/pidgin</a>
+</footer>
 
 <script>
-  const resultEl = document.getElementById('result');
-  const endpointEl = document.getElementById('endpoint');
-  const timingEl = document.getElementById('timing');
-  const statusEl = document.getElementById('status');
+  const examples = {
+    safe: `@run code.review
+wf=generic_review
+mode=draft
+in=[src/main.rs, tests/]
+out=[review_notes]
+do=[draft,review]
+deny=[publish,send]
+risk=low
+human=no`,
+    unsafe: `@run publish.post
+wf=generic_draft_and_distribute
+mode=approval
+in=[draft_content]
+out=[publish_result]
+do=[publish,send]
+deny=[publish,send]
+risk=med
+human=yes`,
+    crit: `@run deploy.prod
+wf=generic_review
+mode=approval
+in=[deploy_config]
+out=[deploy_result]
+do=[publish,delete]
+deny=[]
+risk=crit
+human=no`
+  };
+
+  function loadExample(name) {
+    document.getElementById('packet').value = examples[name];
+    document.getElementById('result').textContent = 'Loaded. Click an endpoint.';
+    document.getElementById('result').style.color = '#666';
+  }
 
   async function healthCheck() {
     try {
       const r = await fetch('/api/v1/health');
       const d = await r.json();
-      statusEl.textContent = 'v' + d.data.version;
-      statusEl.style.background = '#1a3a1a';
-      statusEl.style.color = '#4ade80';
-    } catch {
-      statusEl.textContent = 'offline';
-      statusEl.style.background = '#3a1a1a';
-      statusEl.style.color = '#f87171';
-    }
+      document.getElementById('version').textContent = 'v' + d.data.version;
+      document.getElementById('footerv').textContent = d.data.version;
+    } catch {}
   }
   healthCheck();
-  setInterval(healthCheck, 10000);
 
   async function call(endpoint) {
     const body = document.getElementById('packet').value;
-    endpointEl.textContent = 'POST /api/v1/' + endpoint;
-    resultEl.className = 'result show';
-    resultEl.textContent = '...';
+    const resultEl = document.getElementById('result');
+    const timingEl = document.getElementById('timing');
+    resultEl.textContent = 'Running POST /api/v1/' + endpoint + ' ...';
+    resultEl.style.color = '#666';
     const t0 = performance.now();
     try {
       const r = await fetch('/api/v1/' + endpoint, {
@@ -109,20 +384,13 @@ human=yes</textarea>
       });
       const d = await r.json();
       const ms = Math.round(performance.now() - t0);
-      timingEl.textContent = ms + 'ms';
-      resultEl.className = 'result show ' + (d.ok ? 'ok' : 'err');
+      timingEl.textContent = endpoint + ' responded in ' + ms + 'ms';
+      resultEl.style.color = d.ok ? '#4ade80' : '#f87171';
       resultEl.textContent = JSON.stringify(d, null, 2);
     } catch (e) {
-      resultEl.className = 'result show err';
+      resultEl.style.color = '#f87171';
       resultEl.textContent = 'Error: ' + e.message;
     }
-  }
-
-  function clearResult() {
-    resultEl.className = 'result';
-    resultEl.textContent = '';
-    endpointEl.textContent = '';
-    timingEl.textContent = '';
   }
 </script>
 </body>
