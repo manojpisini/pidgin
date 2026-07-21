@@ -6,7 +6,8 @@
 ██████╔╝██║██║  ██║██║  ███╗██║██╔██╗ ██║
 ██╔═══╝ ██║██║  ██║██║   ██║██║██║╚██╗██║
 ██║     ██║██████╔╝╚██████╔╝██║██║ ╚████║
-╚═╝     ╚═╝╚═════╝  ╚═════╝ ╚═╝╚═╝  ╚═══╝     
+╚═╝     ╚═╝╚═════╝  ╚═════╝ ╚═╝╚═╝  ╚═══╝
+
 ```
 ##  THE AGENT HANDOFF PROTOCOL
 **A compact protocol runtime for agent-to-agent handoffs.** Parse, validate, safety-check, resolve, expand, and log structured messages between agents — with no LLM in the hot path and no network calls in the core.
