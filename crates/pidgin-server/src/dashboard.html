@@ -2,894 +2,1144 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>pidgin // agent handoff protocol</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PIDGIN // Agent Handoff Control Plane</title>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 <style>
-:root {
-  --bg:#020406;--panel:#060a0e;--panel2:#080c10;--border:#0c1218;--border2:#0e141a;
-  --accent:#00ff41;--green:#00ff41;--red:#ff2040;--yellow:#ffc400;
-  --purple:#b44dff;--cyan:#00d4ff;--blue:#3d8bff;--orange:#ff8c00;--pink:#ff6eb4;
-  --ink:#c0c8d0;--dim:#6a727a;--muted:#3a424a;--dark:#1a222a;
-  --glow-g:0 0 20px rgba(0,255,65,0.15);--glow-r:0 0 20px rgba(255,32,64,0.15);
+:root{
+  --bg:#040708;--panel:#080c0e;--panel2:#0b1012;--panel3:#0e1417;
+  --line:#2b373c;--line-soft:#182226;--line-strong:#415159;--text:#d8dfdc;--muted:#84908b;
+  --green:#72f238;--cyan:#24d7ed;--amber:#ffb000;--red:#ff4b34;--purple:#b66cff;
+  --font:"JetBrainsMono Nerd Font","JetBrains Mono NF","CaskaydiaCove Nerd Font",
+         "CaskaydiaCove NF","FiraCode Nerd Font","Fira Code",Consolas,monospace;
 }
-*{margin:0;padding:0;box-sizing:border-box;font-family:'JetBrainsMono Nerd Font','FiraCode Nerd Font','CascadiaCode Nerd Font','SF Mono','Fira Code','Cascadia Code','Courier New',monospace}
-html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink)}
-::-webkit-scrollbar{width:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--muted);border-radius:2px}
-
-/* ===== SHARED HEADER ===== */
-.hdr{height:44px;display:flex;align-items:center;padding:0 16px;gap:14px;border-bottom:1px solid var(--border);background:var(--panel);flex-shrink:0;position:relative;z-index:100}
-.hdr::before{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0.3}
-.hdr .logo{display:flex;align-items:center;gap:8px;flex-shrink:0}
-.hdr .logo svg{width:20px;height:20px;fill:var(--accent)}
-.hdr .logo .txt{font-size:14px;font-weight:700;color:var(--ink);letter-spacing:3px}
-.hdr .logo .sub{font-size:10px;color:var(--dim);letter-spacing:1px;margin-left:4px}
-.hdr nav{display:flex;gap:2px;margin-left:20px}
-.hdr nav .ti{font-size:10px;padding:5px 12px;letter-spacing:1px;cursor:pointer;border:1px solid transparent;color:var(--dim);text-transform:uppercase;transition:all 0.2s;background:transparent;font-family:inherit}
-.hdr nav .ti:hover{color:var(--ink);border-color:var(--border)}
-.hdr nav .ti.on{color:var(--accent);border-color:var(--accent);background:rgba(0,255,65,0.05)}
-.hdr .right{margin-left:auto;display:flex;align-items:center;gap:14px}
-.hdr .env{font-size:10px;color:var(--dim);letter-spacing:1px;border:1px solid var(--border);padding:4px 10px}
-.hdr .status-live{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--green);letter-spacing:1px}
-.hdr .status-live .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
-.hdr .ts-hdr{font-size:10px;color:var(--muted);letter-spacing:1px}
-.hdr .stats-row{display:flex;gap:16px;margin-left:20px}
-.hdr .st-item{display:flex;flex-direction:column;align-items:center;gap:1px}
-.hdr .st-item .st-v{font-size:13px;font-weight:700}
-.hdr .st-item .st-l{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase}
-.hdr .st-item.green .st-v{color:var(--accent)}
-.hdr .st-item.red .st-v{color:var(--red)}
-.hdr .st-item.cyan .st-v{color:var(--cyan)}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;background:#020405;color:var(--text);font-family:var(--font);overflow:hidden}
+body{min-width:0;max-width:100vw}
+button,input,select{font:inherit}
+button{cursor:pointer}
 
 /* ===== DASHBOARD VIEW ===== */
-#dashView{display:none;position:fixed;top:0;left:0;right:0;bottom:0;flex-direction:column}
-#dashView.show{display:flex}
-.dash-body{flex:1;display:grid;grid-template-columns:1fr 1fr 1fr 1fr;grid-template-rows:1fr 1fr;gap:1px;background:var(--border);overflow:hidden}
-.dash-body>*{background:var(--panel);overflow:hidden;min-height:0;min-width:0}
-.dash-body .full-row{grid-column:1/-1}
-
-/* panel header */
-.ph{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;border-bottom:1px solid var(--border);flex-shrink:0}
-.ph .live-dot{width:5px;height:5px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;margin-right:6px;display:inline-block}
-.ph .ph-right{display:flex;gap:8px;align-items:center}
-
-/* comms graph */
-.graph-wrap{display:flex;flex-direction:column;height:100%}
-.graph-area{flex:1;position:relative;overflow:hidden}
-.graph-canvas{width:100%;height:100%}
-.link-key{position:absolute;bottom:8px;left:8px;background:rgba(2,4,6,0.85);border:1px solid var(--border);padding:6px 8px;font-size:8px}
-.link-key .lk-title{color:var(--muted);letter-spacing:2px;margin-bottom:4px}
-.link-key .lk-row{display:flex;align-items:center;gap:6px;padding:1px 0;color:var(--dim)}
-.link-key .lk-row .lk-line{width:16px;height:2px}
-.link-key .lk-row.g .lk-line{background:var(--green)}
-.link-key .lk-row.y .lk-line{background:var(--yellow)}
-.link-key .lk-row.r .lk-line{background:var(--red)}
-.link-key .lk-row.d .lk-line{background:var(--muted)}
-.msg-flow{position:absolute;bottom:8px;right:8px;background:rgba(2,4,6,0.85);border:1px solid var(--border);padding:6px 8px;font-size:8px}
-.msg-flow .mf-title{color:var(--muted);letter-spacing:2px;margin-bottom:4px}
-.msg-flow .mf-row{display:flex;align-items:center;gap:4px;padding:1px 0;font-size:8px}
-.msg-flow .mf-row.out{color:var(--green)}
-.msg-flow .mf-row.in{color:var(--cyan)}
-
-/* pipeline */
-.pipe-wrap{display:flex;flex-direction:column;height:100%;overflow-y:auto}
-.pipe-row{display:flex;align-items:center;gap:10px;padding:6px 14px;border-bottom:1px solid rgba(12,18,24,0.5);font-size:11px}
-.pipe-row .pr-num{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;border:1px solid var(--border);flex-shrink:0}
-.pipe-row .pr-name{width:70px;color:var(--dim);letter-spacing:1px;font-size:10px;flex-shrink:0}
-.pipe-row .pr-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
-.pipe-row .pr-dot.ok{background:var(--green)}.pipe-row .pr-dot.blocked{background:var(--yellow)}.pipe-row .pr-dot.fail{background:var(--red)}.pipe-row .pr-dot.idle{background:var(--muted)}
-.pipe-row .pr-count{color:var(--ink);font-weight:600;flex-shrink:0;width:60px}
-.pipe-row .pr-lat{color:var(--dim);font-size:10px;flex-shrink:0;width:40px}
-.pipe-row .pr-spark{flex:1;min-width:0;height:16px}
-.pipe-row .pr-status{font-size:9px;letter-spacing:1px;flex-shrink:0;width:50px;text-align:right}
-.pipe-row .pr-status.ok{color:var(--green)}.pipe-row .pr-status.blocked{color:var(--yellow)}.pipe-row .pr-status.fail{color:var(--red)}
-.pipe-summary{display:flex;justify-content:space-around;padding:8px 14px;border-top:1px solid var(--border);font-size:10px;flex-shrink:0}
-.pipe-summary .ps-item{text-align:center}
-.pipe-summary .ps-item .ps-v{font-weight:700;color:var(--ink)}
-.pipe-summary .ps-item .ps-l{color:var(--muted);font-size:8px;letter-spacing:1px;margin-top:2px}
-
-/* participants */
-.part-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden}
-.part-hdr{display:flex;padding:4px 12px;font-size:8px;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border);flex-shrink:0}
-.part-hdr span{flex-shrink:0}.part-hdr .pa-agent{width:110px}.part-hdr .pa-role{width:70px}.part-hdr .pa-status{width:44px}.part-hdr .pa-hb{width:28px}.part-hdr .pa-cpu{width:36px}.part-hdr .pa-mem{width:48px}.part-hdr .pa-q{width:36px}
-.part-row{display:flex;padding:4px 12px;font-size:10px;border-bottom:1px solid rgba(12,18,24,0.3);align-items:center}
-.part-row span{flex-shrink:0;color:var(--dim)}.part-row .pa-agent{width:110px;color:var(--ink);display:flex;align-items:center;gap:6px}.part-row .pa-agent .pa-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
-.part-row .pa-role{width:70px;color:var(--dim)}.part-row .pa-status{width:44px;font-size:9px;letter-spacing:1px;font-weight:600}
-.part-row .pa-status.live{color:var(--green)}.part-row .pa-status.awaiting{color:var(--yellow)}.part-row .pa-status.offline{color:var(--red)}
-.part-row .pa-hb{width:28px}.part-row .pa-cpu{width:36px}.part-row .pa-mem{width:48px}.part-row .pa-q{width:36px}
-
-/* chat */
-.chat-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden}
-.chat-msgs{flex:1;overflow-y:auto;padding:6px 12px}
-.chat-msg{display:flex;gap:8px;padding:5px 0;border-bottom:1px solid rgba(12,18,24,0.3);font-size:10px}
-.chat-msg .cm-time{color:var(--muted);font-size:9px;flex-shrink:0;width:42px;padding-top:2px}
-.chat-msg .cm-body{flex:1;min-width:0}
-.chat-msg .cm-agent{font-weight:700;margin-bottom:2px}
-.chat-msg .cm-agent.orch{color:var(--orange)}.chat-msg .cm-agent.runtime{color:var(--cyan)}.chat-msg .cm-agent.safety{color:var(--red)}.chat-msg .cm-agent.exec{color:var(--green)}.chat-msg .cm-agent.human{color:var(--yellow)}.chat-msg .cm-agent.arch{color:var(--purple)}
-.chat-msg .cm-text{color:var(--dim);line-height:1.5}
-.chat-input{display:flex;gap:6px;padding:6px 12px;border-top:1px solid var(--border);flex-shrink:0}
-.chat-input input{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--ink);font-family:inherit;font-size:10px;padding:5px 8px;outline:none}
-.chat-input input:focus{border-color:var(--accent)}
-.chat-input button{border:1px solid var(--accent);background:transparent;color:var(--accent);font-family:inherit;font-size:9px;letter-spacing:1px;padding:5px 12px;cursor:pointer}
-.chat-input button:hover{background:var(--accent);color:var(--bg)}
-
-/* live logs */
-.logs-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden}
-.logs-controls{display:flex;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid var(--border);flex-shrink:0;font-size:9px}
-.logs-controls .lc-lbl{color:var(--muted);letter-spacing:1px}
-.logs-controls label{color:var(--dim);cursor:pointer;display:flex;align-items:center;gap:3px}
-.logs-controls input[type=checkbox]{accent-color:var(--accent)}
-.logs-controls .lc-auto{margin-left:auto;color:var(--green);cursor:pointer}
-.log-entry{display:flex;padding:3px 12px;font-size:10px;border-bottom:1px solid rgba(12,18,24,0.3);line-height:1.5}
-.log-entry .le-time{color:var(--muted);font-size:9px;flex-shrink:0;width:70px}
-.log-entry .le-lvl{flex-shrink:0;width:28px;font-weight:700;font-size:9px;letter-spacing:1px}
-.log-entry .le-lvl.inf{color:var(--cyan)}.log-entry .le-lvl.dbg{color:var(--muted)}.log-entry .le-lvl.wrn{color:var(--yellow)}.log-entry .le-lvl.err{color:var(--red)}.log-entry .le-lvl.ok{color:var(--green)}
-.log-entry .le-src{color:var(--orange);flex-shrink:0;width:90px;font-size:9px}
-.log-entry .le-msg{color:var(--dim);flex:1;min-width:0;word-break:break-all}
-.log-entry .le-msg .hl{color:var(--cyan)}
-
-/* telemetry */
-.tele-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden}
-.tele-time{display:flex;gap:2px;padding:4px 12px;border-bottom:1px solid var(--border);flex-shrink:0}
-.tele-time button{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:inherit;font-size:9px;padding:2px 8px;letter-spacing:1px;cursor:pointer}
-.tele-time button.on{border-color:var(--accent);color:var(--accent)}
-.tele-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:1px;background:var(--border);padding:8px 12px;flex-shrink:0}
-.tele-card{background:var(--panel);padding:6px 8px;text-align:center}
-.tele-card .tc-v{font-size:16px;font-weight:700;color:var(--ink)}
-.tele-card .tc-l{font-size:8px;color:var(--muted);letter-spacing:1px;margin-top:2px;text-transform:uppercase}
-.tele-card .tc-delta{font-size:9px;margin-top:2px}
-.tele-card .tc-delta.up{color:var(--green)}.tele-card .tc-delta.down{color:var(--red)}
-.tele-chart{flex:1;padding:8px 12px;min-height:0}
-.tele-chart canvas{width:100%;height:100%}
-
-/* risk events */
-.risk-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden}
-.risk-table{flex:1;overflow-y:auto}
-.risk-hdr{display:flex;padding:4px 12px;font-size:8px;color:var(--muted);letter-spacing:1px;border-bottom:1px solid var(--border)}
-.risk-hdr span{flex-shrink:0}.risk-hdr .rh-time{width:60px}.risk-hdr .rh-rule{width:44px}.risk-hdr .rh-sev{width:54px}.risk-hdr .rh-agent{width:80px}.risk-hdr .rh-det{flex:1}
-.risk-row{display:flex;padding:4px 12px;font-size:10px;border-bottom:1px solid rgba(12,18,24,0.3)}
-.risk-row span{flex-shrink:0;color:var(--dim)}.risk-row .rr-time{width:60px;color:var(--muted);font-size:9px}.risk-row .rr-rule{width:44px;font-weight:700;letter-spacing:1px;font-size:9px}
-.risk-row .rr-sev{width:54px;font-size:9px;font-weight:700;letter-spacing:1px}.risk-row .rr-sev.med{color:var(--yellow)}.risk-row .rr-sev.high{color:var(--red)}.risk-row .rr-sev.low{color:var(--cyan)}
-.risk-row .rr-agent{width:80px;color:var(--cyan)}.risk-row .rr-det{flex:1;color:var(--dim)}
-.risk-footer{padding:4px 12px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);flex-shrink:0;display:flex;justify-content:space-between}
-
-/* packet inspector */
-.pkt-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden}
-.pkt-hdr{display:flex;justify-content:space-between;padding:4px 12px;border-bottom:1px solid var(--border);font-size:9px;flex-shrink:0}
-.pkt-hdr .ph-title{color:var(--muted);letter-spacing:2px;text-transform:uppercase}
-.pkt-hdr .ph-id{color:var(--dim);font-size:9px}
-.pkt-body{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);overflow:auto}
-.pkt-body>*{background:var(--panel);padding:4px 12px;font-size:10px;display:flex;gap:8px}
-.pkt-body .pk{color:var(--muted);width:60px;flex-shrink:0}
-.pkt-body .pv{color:var(--ink);word-break:break-all}
-.pkt-footer{display:flex;justify-content:space-between;padding:4px 12px;border-top:1px solid var(--border);font-size:9px;color:var(--muted);flex-shrink:0}
+#dashView{width:100vw;height:100vh;overflow:hidden;padding:6px;min-height:0;
+  background:linear-gradient(rgba(255,255,255,.011) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.011) 1px,transparent 1px),var(--bg);background-size:32px 32px}
+#dashView.hide{display:none}
+.topbar{height:50px;display:grid;grid-template-columns:minmax(245px,1.45fr) 112px 112px 68px 158px minmax(420px,2.65fr);border-bottom:1px solid var(--line);background:#040708;position:sticky;top:0;z-index:100}
+.brand,.head-cell{min-width:0;border-right:1px solid var(--line);display:flex;align-items:center}
+.brand{padding:0 16px;gap:13px;white-space:nowrap;overflow:hidden}
+.brand-title{font-size:28px;letter-spacing:2px;color:#d0d6d3}
+.brand-sub{font-size:14px;color:#bdd7af;overflow:hidden;text-overflow:ellipsis}
+.head-cell{justify-content:center;font-size:10px;color:#b5bdb9}
+.head-cell strong{color:var(--green);font-weight:600}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);vertical-align:middle}
+.docs-btn{margin:8px 10px;border:1px solid #9b6700;background:#0b0d08;color:#ffc026;border-radius:3px}
+.docs-btn:hover{background:#171307}
+.top-metrics{display:grid;grid-template-columns:repeat(7,minmax(76px,1fr));min-width:0}
+.top-metric{border-left:1px solid var(--line);display:grid;place-items:center;padding:5px 4px;text-align:center}
+.top-metric span{font-size:8px;color:#9ca6a1;letter-spacing:.4px;white-space:nowrap}
+.top-metric b{font-size:12px;color:var(--green);font-weight:600}
+.top-metric.bad b{color:var(--red)}
+.workspace{height:calc(100vh - 62px);min-height:0;padding:6px 0 0;display:grid;grid-template-columns:minmax(0,40fr) minmax(0,23fr) minmax(0,37fr);grid-template-rows:minmax(0,52fr) minmax(0,48fr);gap:8px;overflow:hidden}
+.panel{min-width:0;min-height:0;overflow:hidden;position:relative;border:1px solid var(--line);background:linear-gradient(180deg,#0a0e10,#070a0c);box-shadow:inset 0 0 0 1px rgba(255,255,255,.012),0 0 16px rgba(116,244,60,.035);transition:border-color .14s ease,box-shadow .14s ease}
+.panel.is-active{border-color:var(--green);box-shadow:inset 0 0 0 1px rgba(114,242,56,.11),0 0 16px rgba(114,242,56,.13)}
+.panel-header,.section-header{height:36px;min-height:36px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:linear-gradient(180deg,#0a0f11,#080c0e);font-size:10px;letter-spacing:.35px}
+.panel.is-active>.panel-header,.panel.is-active .section-header:first-child{box-shadow:inset 3px 0 0 var(--green)}
+.live{font-size:8px;color:var(--green)}
+.controls{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:8px}
+.controls select,.controls button{height:24px;background:#090d0f;color:#c8cfcc;border:1px solid var(--line);font-size:8px;padding:0 8px}
+.comm{grid-column:1;grid-row:1}.pipeline{grid-column:2;grid-row:1}.right-top{grid-column:3;grid-row:1}
+.logs{grid-column:1;grid-row:2}.telemetry{grid-column:2;grid-row:2}.right-bottom{grid-column:3;grid-row:2}
+.graph-shell{position:absolute;inset:36px 0 0;display:grid;grid-template-columns:108px 1fr;background:radial-gradient(circle at 50% 42%,rgba(116,244,60,.04),transparent 37%),linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:auto,28px 28px,28px 28px}
+.graph-legend{border-right:1px solid var(--line);padding:12px 8px;background:rgba(5,8,9,.92);font-size:8px;color:#a4ada8}
+.graph-legend h4{margin:0 0 10px;font-size:9px;color:#d0d7d4}
+.graph-legend div{margin:8px 0;white-space:nowrap}
+.graph-legend hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+#network{width:100%;height:100%;min-width:0;min-height:0}
+.vis-network:focus{outline:none}
+.graph-tooltip{position:absolute;right:8px;bottom:8px;background:#070b0d;border:1px solid var(--line);padding:7px 9px;font-size:8px;color:#8e9994;pointer-events:none}
+.pipeline-body{position:absolute;inset:36px 0 68px;padding:7px 12px}
+.stage{height:calc(100% / 7);min-height:41px;border-bottom:1px solid var(--line-soft);display:grid;grid-template-columns:28px minmax(55px,.9fr) minmax(84px,1.15fr) 50px minmax(68px,1fr);align-items:center;column-gap:5px;font-size:8px}
+.stage-num{width:20px;height:20px;border:1px solid #8a9490;border-radius:50%;display:grid;place-items:center}
+.stage-status{color:var(--green);white-space:nowrap}.stage.warn .stage-status,.stage.warn .stage-num{color:var(--amber);border-color:var(--amber)}
+.spark{width:100%;height:22px;display:block;overflow:visible}
+.summary{position:absolute;left:0;right:0;bottom:0;height:68px;display:grid;grid-template-columns:repeat(5,1fr);border-top:1px solid var(--line)}
+.summary div{display:grid;place-items:center;border-right:1px solid var(--line);font-size:8px;color:#89948f;text-align:center}
+.summary b{display:block;font-size:14px;color:#d7ddda}.summary .bad b{color:var(--red)}
+.right-top-grid{height:100%;display:grid;grid-template-columns:minmax(0,56fr) minmax(0,44fr);overflow:hidden}
+.participants{border-right:1px solid var(--line);min-width:0;max-width:100%;overflow:hidden}
+.chat{min-width:0;max-width:100%;overflow:hidden}
+.table-wrap{height:calc(100% - 36px);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#314047 #0a0e10}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th,td{border-bottom:1px solid #12191c;padding:5px 3px;text-align:left;font-size:6.6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0}
+th{height:27px;color:#89938f;font-weight:400;border-bottom-color:var(--line)}
+.role{border:1px solid var(--line);padding:2px 4px;color:#aab3af;border-radius:2px}
+.live-tag,.off-tag,.wait-tag{padding:1px 4px;border:1px solid;border-radius:2px}
+.live-tag{color:var(--green);border-color:#285f1c}.off-tag{color:var(--red);border-color:#68251f}.wait-tag{color:var(--amber);border-color:#745508}
+.chat-body{height:calc(100% - 36px);display:grid;grid-template-rows:1fr 43px;min-height:0}
+.chat-list{overflow-y:auto;overflow-x:hidden;padding:6px;scrollbar-width:thin;scrollbar-color:#314047 #0a0e10}
+.msg{border:1px solid var(--line);background:#0d1214;border-radius:3px;padding:5px 6px;margin-bottom:5px;font-size:6.6px;min-width:0;max-width:100%;overflow:hidden}
+.msg-top{display:grid;grid-template-columns:46px minmax(0,1fr) 11px;align-items:center;margin-bottom:4px;min-width:0}.msg time{color:#707c77}.msg b{color:var(--cyan)}.msg.orch b{color:var(--green)}.msg.safety b{color:var(--amber)}.msg.human{border-color:#6d5310}
+.msg p{margin:0;color:#d7ddda;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.composer{border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:5px;padding:5px;min-width:0;overflow:hidden}
+.composer input,.composer button{background:#0a0e10;border:1px solid var(--line);color:#c6cfcb;font-size:7px;padding:0 6px;min-width:0;max-width:100%}
+.log-toolbar{position:absolute;top:36px;left:0;right:0;height:32px;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 10px;gap:12px;font-size:8px;color:#85908b}
+.log-view{position:absolute;inset:68px 0 0;padding:8px 10px;overflow-y:auto;overflow-x:hidden;background:#050809;font-size:8px;line-height:1.65;scrollbar-width:thin;scrollbar-color:#314047 #050809}
+.logline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ts{color:#78837e}.inf{color:var(--green)}.dbg{color:var(--cyan)}.wrn{color:var(--amber)}.err{color:var(--red)}
+.telemetry-body{position:absolute;inset:36px 0 0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#314047 #080c0e}
+.tabs{height:32px;display:flex;align-items:center;justify-content:flex-end;gap:15px;padding:0 10px;border-bottom:1px solid var(--line);font-size:8px;color:#8c9691}
+.tabs .active{color:var(--green);background:#10200c;padding:5px 7px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr)}
+.kpi{min-width:0;height:82px;padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.kpi span{display:block;font-size:7px;color:#8b9691;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi b{display:block;font-size:17px;margin:5px 0;color:#e1e6e4}.kpi small{font-size:7px;color:var(--green)}.kpi.bad b,.kpi.bad small{color:var(--red)}
+.chart-wrap{position:absolute;left:9px;right:9px;bottom:7px;top:198px}.chart-label{font-size:7px;color:#87928d;margin-bottom:5px}
+#throughput{width:100%;height:calc(100% - 15px);display:block}
+.right-bottom{display:grid;grid-template-rows:minmax(138px,42%) minmax(0,58%)}
+.events{border-bottom:1px solid var(--line);overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#314047 #080c0e}
+.events table th,.events table td{font-size:7px;padding:5px}
+.inspector{padding:8px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#314047 #080c0e}
+.inspector-head{height:24px;display:flex;justify-content:space-between;align-items:center;font-size:8px}
+.packet-grid{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);margin-top:7px}
+.packet-section{min-width:0}.packet-row{display:grid;grid-template-columns:65px 1fr;padding:7px;border-bottom:1px solid var(--line);font-size:8px}
+.packet-row label{color:#87928d}.packet-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.packet-foot{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;font-size:7px;color:#8b9691}
 
 /* ===== DOCS VIEW ===== */
-#docsView{display:none;position:fixed;top:0;left:0;right:0;bottom:0;flex-direction:column}
-#docsView.show{display:flex}
-.docs-body{flex:1;display:grid;grid-template-columns:200px 1fr 200px;overflow:hidden}
+#docsView{display:none;width:100vw;height:100vh;padding:6px;overflow:hidden}
+#docsView.show{display:block}
+.docs-top{height:50px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:340px 1fr 465px;align-items:stretch;background:#040708;position:sticky;top:0;z-index:20}
+.docs-brand{display:flex;align-items:center;padding:0 16px;gap:12px;border-right:1px solid var(--line);white-space:nowrap}
+.docs-brand strong{font-size:27px;letter-spacing:2px}.docs-brand small{font-size:13px;color:#bdd9ac}
+nav{display:flex;align-items:center;justify-content:center;gap:20px;min-width:0;border-right:1px solid var(--line);font-size:9px;color:#aeb6b2}
+nav a{padding:10px 0;white-space:nowrap;cursor:pointer}
+.active-nav{border:1px solid #a66d00;color:#ffc026;padding:9px 16px!important}
+.statuses{display:grid;grid-template-columns:145px 165px 210px}
+.chip{display:flex;align-items:center;justify-content:center;border-left:1px solid var(--line);font-size:9px;white-space:nowrap}
+.green{color:var(--green)}.cyan{color:var(--cyan)}.amber{color:var(--amber)}
+.layout{display:grid;grid-template-columns:minmax(190px,19fr) minmax(0,64fr) minmax(170px,17fr);height:calc(100vh - 98px);min-height:0;overflow:hidden;max-width:100%}
+.left{border-right:1px solid var(--line);background:#070a0c;padding:12px;min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#314047 #070a0c}
+.search{height:35px;border:1px solid #394348;background:#0a0e10;display:grid;grid-template-columns:18px 1fr 36px;align-items:center;padding:0 9px;color:#7d8883}
+.search input{min-width:0;background:transparent;border:0;outline:0;color:#c6cdca}
+.kbd{border:1px solid var(--line);padding:2px 4px;text-align:center;background:#151a1c;font-size:8px}
+.side-title{font-size:9px;color:#929d98;margin:19px 0 8px}
+.menu a{display:grid;grid-template-columns:18px 1fr;align-items:center;gap:8px;padding:8px 10px;font-size:10px;color:#abb4b0;border:1px solid transparent;white-space:nowrap;cursor:pointer}
+.menu a:hover{background:#0d1214}
+.menu .active{border-color:#3c9b25;background:#0c1b0a;color:var(--green);box-shadow:0 0 12px rgba(116,244,60,.08)}
+.help,.version{border:1px solid var(--line);padding:13px;margin-top:20px;background:#080c0e}
+.help h3,.version h3{margin:0 0 9px;color:var(--cyan);font-size:11px}.version h3{color:#c8d0cc}
+.help p,.version p{font-size:9px;line-height:1.6;color:#a5afaa}
+.link{color:var(--cyan);font-size:9px;display:block;margin-top:8px;cursor:pointer}
+.main{padding:13px 16px 18px;min-width:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#314047 #050809;background:linear-gradient(rgba(255,255,255,.011) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.011) 1px,transparent 1px),#050809;background-size:32px 32px}
+.crumb{font-size:9px;color:#929d98;margin-bottom:16px}
+.hero{display:grid;grid-template-columns:minmax(500px,1.45fr) minmax(350px,.9fr);gap:14px}
+.hero h1{font-size:43px;margin:0 0 5px;letter-spacing:1px}
+.hero h2{font-size:17px;color:var(--green);font-weight:400;margin:0 0 16px}
+.hero p{font-size:10px;color:#9aa5a0;line-height:1.7;max-width:660px}
+.doc-panel{border:1px solid var(--line);background:linear-gradient(180deg,#0a0e10,#070b0d);min-width:0;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(255,255,255,.012),0 0 14px rgba(116,244,60,.028);transition:border-color .14s ease,box-shadow .14s ease}
+.doc-panel.is-active{border-color:var(--green);box-shadow:inset 0 0 0 1px rgba(114,242,56,.1),0 0 15px rgba(114,242,56,.11)}
+.what{padding:16px}.what h3{color:var(--cyan);font-size:11px;margin:0 0 9px}.what p{font-size:10px;line-height:1.55;color:#abb4b0}
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);margin-top:13px}
+.mini-stats div{padding:9px;border-right:1px solid var(--line);font-size:8px}.mini-stats b{display:block;font-size:11px;margin-top:4px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin-top:11px}
+.card{padding:16px;border-right:1px solid var(--line)}.card:last-child{border-right:0}
+.card h3{font-size:12px;color:var(--cyan);margin:0 0 8px}.card p{font-size:9px;line-height:1.55;color:#a5afaa}.card a{font-size:9px;color:var(--green);cursor:pointer}
+.mid{display:grid;grid-template-columns:minmax(580px,1.4fr) minmax(360px,1fr);gap:11px;margin-top:11px}
+.box-title{padding:10px 13px;color:var(--cyan);font-size:11px;border-bottom:1px solid var(--line-soft);background:linear-gradient(180deg,#0a0f11,#080c0e);letter-spacing:.45px;font-weight:600}
+.lifecycle{padding-bottom:12px}
+.steps{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));align-items:start;padding:16px 12px 5px}
+.step{text-align:center;font-size:7px;color:#a7b1ac}
+.icon{width:43px;height:43px;border:1px solid var(--cyan);border-radius:50%;margin:0 auto 7px;display:grid;place-items:center;font-size:17px;color:var(--cyan);box-shadow:0 0 12px rgba(39,217,239,.08)}
+.step.green-step .icon{border-color:var(--green);color:var(--green)}.step.amber-step .icon{border-color:var(--amber);color:var(--amber)}
+.step b{display:block;color:var(--cyan);margin-bottom:5px}
+.arrow{align-self:center;color:var(--cyan);font-size:17px;text-align:center;padding-top:9px}
+.code{padding:13px;font-size:10px;line-height:1.55;background:#060a0b}
+.code .key{color:var(--green)}.code .val{color:#e3c76e}.code .comment{color:#69736f;font-style:italic}
+.lower{display:grid;grid-template-columns:minmax(270px,1fr) minmax(390px,1.4fr) minmax(360px,1.2fr);gap:11px;margin-top:11px}
+.codeblock{padding:12px;font-size:8px;line-height:1.7}.ln{color:#505b56;display:inline-block;width:27px}
+.cmds{width:100%;border-collapse:collapse;table-layout:fixed}
+.cmds th,.cmds td{border:1px solid var(--line);padding:5px;font-size:7px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmds th{color:#8c9792;font-weight:400}.cmds td:first-child,.cmds td:last-child{color:var(--green)}
+.rules{padding-bottom:12px}.rulegrid{display:grid;grid-template-columns:1fr 1fr;padding:8px}
+.rulegrid div{padding:7px;border:1px solid var(--line);font-size:8px;min-height:29px}
+.rules p{padding:0 10px;font-size:8px;line-height:1.55;color:#a3ada8}
+.rules>a{padding:0 10px;font-size:9px;cursor:pointer}
+.right-toc{border-left:1px solid var(--line);background:#070a0c;padding:24px 17px;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:#314047 #070a0c}
+.right-toc h3{font-size:10px;color:var(--green);margin:0 0 17px}
+.toc a{display:block;font-size:9px;color:#aeb7b3;padding:8px 0 8px 15px;border-left:1px solid #263033;cursor:pointer}
+.toc a:before{content:"\25A1";margin-left:-19px;margin-right:9px;color:#59645f}
+footer{height:36px;border-top:1px solid var(--line);display:flex;align-items:center;padding:0 14px;font-size:8px;color:#8c9792;gap:19px;background:#040708}
 
-/* docs left sidebar */
-.docs-side{border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;background:var(--panel)}
-.docs-search{padding:8px;border-bottom:1px solid var(--border)}
-.docs-search input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--ink);font-family:inherit;font-size:10px;padding:6px 8px;outline:none}
-.docs-search input:focus{border-color:var(--accent)}
-.docs-nav{flex:1;overflow-y:auto;padding:4px 0}
-.docs-section{padding:10px 12px 4px;font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
-.docs-item{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;color:var(--dim);cursor:pointer;transition:all 0.15s}
-.docs-item:hover{color:var(--ink);background:rgba(0,255,65,0.03)}
-.docs-item.on{color:var(--accent);background:rgba(0,255,65,0.05);border-left:2px solid var(--accent)}
-.docs-item .di-icon{width:14px;text-align:center;font-size:10px;flex-shrink:0}
-.docs-help{border-top:1px solid var(--border);padding:10px 12px;flex-shrink:0}
-.docs-help .dh-title{font-size:10px;color:var(--muted);letter-spacing:1px;margin-bottom:6px}
-.docs-help p{font-size:10px;color:var(--dim);line-height:1.5;margin-bottom:6px}
-.docs-help a{color:var(--accent);font-size:10px;text-decoration:none;display:flex;align-items:center;gap:4px;margin-bottom:4px}
-.docs-help a:hover{text-decoration:underline}
-.docs-ver{border-top:1px solid var(--border);padding:10px 12px;flex-shrink:0;font-size:9px;color:var(--muted)}
-.docs-ver .dv-title{color:var(--accent);font-size:10px;letter-spacing:1px;margin-bottom:4px;display:flex;align-items:center;gap:4px}
+/* docs content sections */
+.doc-content-section{display:none}
+.doc-content-section.active{display:block}
+.doc-content-section h2{font-size:15px;color:var(--green);letter-spacing:1px;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);font-weight:600}
+.doc-content-section h3{font-size:12px;color:var(--cyan);margin:14px 0 6px}
+.doc-content-section h4{font-size:10px;color:var(--amber);margin:10px 0 4px}
+.doc-content-section p{font-size:10px;color:#a5afaa;line-height:1.7;margin-bottom:8px}
+.doc-content-section pre{background:#060a0b;border:1px solid var(--line);padding:10px;font-size:9px;color:#abb4b0;line-height:1.6;overflow-x:auto;margin:8px 0}
+.doc-content-section ul,.doc-content-section ol{font-size:10px;color:#a5afaa;line-height:1.7;padding-left:16px;margin-bottom:8px}
+.doc-content-section li{margin-bottom:4px}
+.doc-content-section code{background:#0a0e10;padding:1px 4px;color:var(--amber);font-size:9px;border:1px solid var(--line)}
+.doc-content-section .field-table{width:100%;border-collapse:collapse;margin:8px 0}
+.doc-content-section .field-table th{text-align:left;color:#8c9792;font-size:8px;padding:4px 8px;border-bottom:1px solid var(--line);font-weight:400;letter-spacing:.5px}
+.doc-content-section .field-table td{padding:4px 8px;border-bottom:1px solid #12191c;font-size:9px;color:#abb4b0}
+.doc-content-section .field-table td:first-child{color:var(--green);font-weight:600}
+.doc-content-section .field-table td:nth-child(2){color:var(--cyan)}
+.doc-content-section .rule-card{border:1px solid var(--line);padding:10px;margin:6px 0;background:#0a0e10}
+.doc-content-section .rule-card .rule-id{color:var(--red);font-weight:700;font-size:10px;letter-spacing:.5px}
+.doc-content-section .rule-card .rule-name{color:var(--cyan);font-size:10px;margin-left:8px}
+.doc-content-section .rule-card p{font-size:9px;color:#8c9792;margin:4px 0 0}
+.doc-content-section .note{border-left:3px solid var(--amber);padding:8px 12px;margin:10px 0;background:rgba(255,176,0,.04);font-size:9px;color:#abb4b0}
+.doc-content-section .warning{border-left:3px solid var(--red);padding:8px 12px;margin:10px 0;background:rgba(255,75,52,.04);font-size:9px;color:#abb4b0}
 
-/* docs main */
-.docs-main{overflow-y:auto;padding:0;background:var(--panel)}
-.docs-breadcrumb{padding:12px 24px 0;font-size:10px;color:var(--muted)}
-.docs-breadcrumb span{color:var(--accent)}
-.docs-hero{padding:20px 24px;border-bottom:1px solid var(--border)}
-.docs-hero h1{font-size:24px;color:var(--ink);font-weight:700;letter-spacing:2px;display:flex;align-items:center;gap:10px;margin-bottom:6px}
-.docs-hero h1 svg{width:28px;height:28px;fill:var(--accent)}
-.docs-hero h2{font-size:14px;color:var(--accent);font-weight:400;margin-bottom:10px}
-.docs-hero p{font-size:12px;color:var(--dim);line-height:1.7;max-width:700px}
-.docs-cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);border-bottom:1px solid var(--border)}
-.docs-cards>*{background:var(--panel);padding:14px 16px}
-.docs-cards .dc-title{font-size:11px;color:var(--ink);font-weight:700;letter-spacing:1px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
-.docs-cards .dc-title .dc-icon{font-size:14px}
-.docs-cards .dc-desc{font-size:10px;color:var(--dim);line-height:1.6;margin-bottom:8px}
-.docs-cards .dc-link{font-size:10px;color:var(--accent);text-decoration:none;letter-spacing:1px}
-.docs-cards .dc-link:hover{text-decoration:underline}
-.docs-sections{padding:0 24px 24px}
-.docs-sections h2{font-size:12px;color:var(--ink);font-weight:700;letter-spacing:2px;margin:20px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
-.docs-sections h3{font-size:11px;color:var(--cyan);margin:12px 0 4px}
-.docs-sections p{font-size:11px;color:var(--dim);line-height:1.7;margin-bottom:6px}
-.docs-sections pre{background:var(--bg);border:1px solid var(--border);padding:10px;font-size:10px;color:var(--dim);line-height:1.6;overflow-x:auto;margin:8px 0}
-.docs-sections pre .k{color:var(--accent)}.docs-sections pre .v{color:var(--yellow)}.docs-sections pre .c{color:var(--cyan)}.docs-sections pre .r{color:var(--red)}.docs-sections pre .d{color:var(--muted)}
-.docs-sections ul{font-size:11px;color:var(--dim);line-height:1.7;padding-left:16px;margin-bottom:6px}
-.docs-sections .cmd-table{width:100%;border-collapse:collapse;font-size:10px;margin:8px 0}
-.docs-sections .cmd-table th{text-align:left;color:var(--muted);font-size:9px;letter-spacing:1px;padding:4px 8px;border-bottom:1px solid var(--border);text-transform:uppercase}
-.docs-sections .cmd-table td{padding:4px 8px;border-bottom:1px solid rgba(12,18,24,0.3);color:var(--dim)}
-.docs-sections .cmd-table td:first-child{color:var(--green);font-weight:600}
-.docs-sections .sg-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:8px 0}
-.docs-sections .sg-item{display:flex;align-items:center;gap:8px;font-size:10px;padding:4px 8px;border:1px solid var(--border);background:var(--bg)}
-.docs-sections .sg-item .sg-name{color:var(--red);font-weight:700;letter-spacing:1px;width:44px;flex-shrink:0}
-.docs-sections .sg-item .sg-desc{color:var(--dim)}
-
-/* docs right sidebar */
-.docs-toc{border-left:1px solid var(--border);padding:16px 12px;background:var(--panel)}
-.docs-toc .dt-title{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
-.docs-toc .dt-item{font-size:10px;color:var(--dim);padding:3px 0;cursor:pointer;display:flex;align-items:center;gap:6px}
-.docs-toc .dt-item:hover{color:var(--ink)}
-.docs-toc .dt-item.on{color:var(--accent)}
-.docs-toc .dt-item::before{content:'';width:4px;height:4px;border:1px solid var(--muted);flex-shrink:0}
-.docs-toc .dt-item.on::before{border-color:var(--accent);background:var(--accent)}
-
-/* footer */
-.docs-footer{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-top:1px solid var(--border);background:var(--panel);font-size:9px;color:var(--muted);flex-shrink:0}
-.docs-footer a{color:var(--dim);text-decoration:none}
-.docs-footer a:hover{color:var(--accent)}
-
-/* scanlines */
-.scanlines{position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.02) 2px,rgba(0,0,0,0.02) 4px);pointer-events:none;z-index:9999}
-
-/* graph node styles */
-.g-node{position:absolute;cursor:default;user-select:none}
-.g-node .gn-box{border:1px solid var(--border);background:var(--panel);padding:6px 8px;font-size:9px;min-width:100px}
-.g-node .gn-box.orch{border-color:rgba(255,140,0,0.4)}
-.g-node .gn-box.runtime{border-color:rgba(0,212,255,0.4)}
-.g-node .gn-box.safety{border-color:rgba(255,32,64,0.4)}
-.g-node .gn-box.exec{border-color:rgba(0,255,65,0.4)}
-.g-node .gn-box.human{border-color:rgba(255,196,0,0.4)}
-.g-node .gn-box.mem{border-color:rgba(180,77,255,0.4)}
-.g-node .gn-box.infra{border-color:rgba(106,114,122,0.4)}
-.g-node .gn-name{color:var(--ink);font-weight:700;font-size:10px;margin-bottom:2px}
-.g-node .gn-ip{color:var(--muted);font-size:8px;margin-bottom:2px}
-.g-node .gn-traffic{display:flex;gap:6px;font-size:8px}
-.g-node .gn-traffic .up{color:var(--green)}
-.g-node .gn-traffic .down{color:var(--cyan)}
-
-/* lifecycle diagram */
-.lifecycle{display:flex;align-items:center;justify-content:center;gap:4px;padding:12px;margin:12px 0}
-.lc-step{display:flex;flex-direction:column;align-items:center;gap:4px}
-.lc-step .lc-icon{width:40px;height:40px;border-radius:50%;border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:16px}
-.lc-step .lc-label{font-size:10px;color:var(--ink);font-weight:700;letter-spacing:1px}
-.lc-step .lc-desc{font-size:8px;color:var(--muted);text-align:center;max-width:70px;line-height:1.3}
-.lc-arrow{color:var(--green);font-size:14px;margin:0 4px}
+.top,.workspace,.panel,.right-top-grid,.participants,.chat,.table-wrap,.chat-body,.chat-list,
+.pipeline-body,.stage,.telemetry-body,.events,.inspector{max-width:100%;overflow-x:hidden}
+table{max-width:100%}
+.section-header,.panel-header{min-width:0}
+.section-header>span,.panel-header>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.table-wrap,.chat-list,.log-view,.telemetry-body,.events,.inspector{scrollbar-width:none;-ms-overflow-style:none}
+.table-wrap::-webkit-scrollbar,.chat-list::-webkit-scrollbar,.log-view::-webkit-scrollbar,.telemetry-body::-webkit-scrollbar,.events::-webkit-scrollbar,.inspector::-webkit-scrollbar{width:0;height:0}
+.left,.main,.right-toc{scrollbar-width:none;-ms-overflow-style:none}
+.left::-webkit-scrollbar,.main::-webkit-scrollbar,.right-toc::-webkit-scrollbar{width:0;height:0}
+.workspace,.panel,.right-top-grid,.participants,.chat,.table-wrap,.chat-body,.chat-list,
+.pipeline-body,.stage,.telemetry-body,.events,.inspector{max-width:100%;overflow-x:hidden}
+.panel-header,.section-header,.summary,.packet-grid,.composer,.log-toolbar,.tabs{border-color:var(--line)}
+.summary div:last-child,.top-metric:last-child,.card:last-child{border-right:0}
+.stage:last-child{border-bottom:0}
+.table-wrap table{border-collapse:separate;border-spacing:0}
+.table-wrap th{position:sticky;top:0;z-index:2;background:#080d0f}
+.table-wrap th,.table-wrap td{border-right:1px solid rgba(39,49,54,.34)}
+.table-wrap th:last-child,.table-wrap td:last-child{border-right:0}
+.msg:last-child{margin-bottom:0}
+.packet-section:first-child{border-right:1px solid var(--line)}
+.packet-row:last-child{border-bottom:0}
+.controls select,.controls button,.docs-btn,.composer input,.composer button{border-color:var(--line-strong)}
+.controls button:hover,.docs-btn:hover,.composer button:hover{border-color:var(--green);color:#eaffdf}
+.graph-legend{box-shadow:inset -1px 0 0 rgba(255,255,255,.012)}
+.graph-legend h4,.chart-label,.box-title,.side-title{letter-spacing:.45px}
+.stage b,.panel-title,.section-header>span:first-child,.panel-header>span:first-child{font-weight:600}
+.summary b,.kpi b,.top-metric b{font-variant-numeric:tabular-nums}
+.docs-brand,.head-cell,.topbar,.chip{max-width:100%;overflow:hidden}
+.top,.layout,.left,.main,.right-toc,.hero,.cards,.mid,.lower,.doc-panel{max-width:100%;overflow-x:hidden}
 </style>
 </head>
 <body>
 
-<div class="scanlines"></div>
-
 <!-- ==================== DASHBOARD VIEW ==================== -->
-<div id="dashView" class="show">
-  <div class="hdr">
-    <div class="logo">
-      <svg viewBox="0 0 24 24"><path d="M22 5.18L10.59 16.6l-4.24-4.24-1.41 1.41 5.66 5.66L23.41 6.59 22 5.18zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
-      <span class="txt">PIDGIN</span>
-      <span class="sub">// Agent Handoff Control Plane</span>
-    </div>
-    <div class="env">ENV: LOCAL HOST</div>
-    <div class="status-live"><span class="dot"></span>STATUS: LIVE</div>
-    <button class="ti on" id="btnDashView" style="border:1px solid var(--accent);color:var(--accent);padding:4px 10px;font-size:10px;letter-spacing:1px;background:transparent;font-family:inherit;cursor:pointer">DOCS</button>
-    <span class="ts-hdr" id="hdrTs">2025-05-22 14:45:12 UTC</span>
-    <div class="stats-row">
-      <div class="st-item green"><span class="st-v" id="stActive">27</span><span class="st-l">W ACTIVE</span></div>
-      <div class="st-item green"><span class="st-v" id="stHps">418</span><span class="st-l">HANDOFFS/MIN</span></div>
-      <div class="st-item cyan"><span class="st-v" id="stPps">1,248</span><span class="st-l">PKTS/SEC</span></div>
-      <div class="st-item green"><span class="st-v" id="stLat">23ms</span><span class="st-l">AVG LAT</span></div>
-      <div class="st-item red"><span class="st-v" id="stBlk">7</span><span class="st-l">BLOCKED</span></div>
-      <div class="st-item green"><span class="st-v" id="stErr">0.38%</span><span class="st-l">ERROR RATE</span></div>
-      <div class="st-item green"><span class="st-v" id="stUptime">03:15:27</span><span class="st-l">UPTIME</span></div>
+<div id="dashView">
+<header class="topbar">
+  <div class="brand"><span class="brand-title">PIDGIN</span><span class="brand-sub">// Agent Handoff Control Plane</span></div>
+  <div class="head-cell"><strong>ENV: LOCAL HOST</strong></div>
+  <div class="head-cell"><strong>STATUS: LIVE&nbsp;<i class="status-dot"></i></strong></div>
+  <button class="docs-btn" onclick="showDocs()">DOCS</button>
+  <div class="head-cell" id="clock">2025-05-22 14:45:12 UTC</div>
+  <div class="top-metrics">
+    <div class="top-metric"><span>WF ACTIVE</span><b>27</b></div>
+    <div class="top-metric"><span>HANDOFFS/MIN</span><b id="mHandoff">418</b></div>
+    <div class="top-metric"><span>PKTS/SEC</span><b id="mPps">1,248</b></div>
+    <div class="top-metric"><span>AVG LAT</span><b id="mLat">23ms</b></div>
+    <div class="top-metric"><span>BLOCKED</span><b>7</b></div>
+    <div class="top-metric bad"><span>ERROR RATE</span><b id="mErr">0.38%</b></div>
+    <div class="top-metric"><span>UPTIME</span><b id="mUp">03:15:27</b></div>
+  </div>
+</header>
+<main class="workspace">
+<section class="panel comm is-active">
+  <div class="panel-header">
+    <span>COMMUNICATIONS GRAPH <i class="status-dot"></i> <span class="live">LIVE</span></span>
+    <div class="controls">
+      <span>LAYOUT:</span><select id="layoutSelect"><option value="fixed">FORCE</option><option value="hierarchical">HIERARCHY</option></select>
+      <span>FILTER:</span><select id="filterSelect"><option value="all">ALL</option><option value="agents">AGENTS</option><option value="infra">INFRA</option></select>
+      <button id="fitGraph">FIT</button><button id="stabilizeGraph">STABILIZE</button>
     </div>
   </div>
-
-  <div class="dash-body">
-    <!-- Communications Graph -->
-    <div class="graph-wrap" style="grid-column:1/3">
-      <div class="ph"><span><span class="live-dot"></span>COMMUNICATIONS GRAPH</span><div class="ph-right"><span>LAYOUT: FORCE</span><span>FILTER: ALL</span></div></div>
-      <div class="graph-area" id="graphArea">
-        <canvas class="graph-canvas" id="graphCanvas"></canvas>
-        <div class="link-key">
-          <div class="lk-title">LINK KEY</div>
-          <div class="lk-row g"><div class="lk-line"></div><span>500+/s</span></div>
-          <div class="lk-row y"><div class="lk-line"></div><span>200-500/s</span></div>
-          <div class="lk-row r"><div class="lk-line"></div><span>50-200/s</span></div>
-          <div class="lk-row d"><div class="lk-line"></div><span>&lt; 50/s</span></div>
-        </div>
-        <div class="msg-flow">
-          <div class="mf-title">MSG FLOW</div>
-          <div class="mf-row out">+ OUTGOING</div>
-          <div class="mf-row in">+ INCOMING</div>
-        </div>
-      </div>
+  <div class="graph-shell">
+    <aside class="graph-legend">
+      <h4>LINK KEY</h4>
+      <div style="color:var(--green)">&#x2501;&#x2501; 500+/s</div>
+      <div style="color:var(--cyan)">&#x2501;&#x2501; 200-500/s</div>
+      <div style="color:var(--amber)">&#x2501;&#x2501; 50-200/s</div>
+      <div style="color:#b9c1be">&#x2504;&#x2504; &lt; 50/s</div>
+      <hr><h4>MSG FLOW</h4>
+      <div style="color:var(--green)">&#x2191; OUTGOING</div>
+      <div style="color:var(--cyan)">&#x2193; INCOMING</div>
+      <hr><div>DRAG NODES</div><div>SCROLL TO ZOOM</div>
+    </aside>
+    <div id="network"></div>
+    <div class="graph-tooltip" id="graphTip">SELECT A NODE OR EDGE</div>
+  </div>
+</section>
+<section class="panel pipeline">
+  <div class="panel-header"><span>HANDOFF PIPELINE</span><span class="live"><i class="status-dot"></i> LIVE</span></div>
+  <div class="pipeline-body" id="stages"></div>
+  <div class="summary"><div>TOTAL WF<b>27</b></div><div>IN FLIGHT<b>19</b></div><div>COMPLETED<b id="completed">1,234</b></div><div class="bad">FAILED<b>8</b></div><div>CANCELLED<b>4</b></div></div>
+</section>
+<section class="panel right-top">
+  <div class="right-top-grid">
+    <div class="participants">
+      <div class="section-header"><span>PARTICIPANTS</span><span style="color:var(--green)">11 / 20 ONLINE</span></div>
+      <div class="table-wrap"><table>
+        <colgroup><col style="width:26%"><col style="width:18%"><col style="width:17%"><col style="width:7%"><col style="width:9%"><col style="width:13%"><col style="width:10%"></colgroup>
+        <thead><tr><th>AGENT</th><th>ROLE</th><th>STATUS</th><th>HB</th><th>CPU</th><th>MEM</th><th>QUEUE</th></tr></thead>
+        <tbody id="participants"></tbody>
+      </table></div>
     </div>
-
-    <!-- Handoff Pipeline -->
-    <div class="pipe-wrap">
-      <div class="ph"><span><span class="live-dot"></span>HANDOFF PIPELINE</span></div>
-      <div id="pipeList"></div>
-      <div class="pipe-summary">
-        <div class="ps-item"><div class="ps-v" id="psWf">27</div><div class="ps-l">TOTAL WF</div></div>
-        <div class="ps-item"><div class="ps-v" id="psFlight">19</div><div class="ps-l">IN FLIGHT</div></div>
-        <div class="ps-item"><div class="ps-v" id="psDone">1,234</div><div class="ps-l">COMPLETED</div></div>
-        <div class="ps-item"><div class="ps-v" id="psFail" style="color:var(--red)">8</div><div class="ps-l">FAILED</div></div>
-        <div class="ps-item"><div class="ps-v" id="psCancel">4</div><div class="ps-l">CANCELLED</div></div>
-      </div>
-    </div>
-
-    <!-- Participants -->
-    <div class="part-wrap">
-      <div class="ph"><span>PARTICIPANTS</span><span style="color:var(--green);font-size:9px">11 / 20 ONLINE</span></div>
-      <div class="part-hdr"><span class="pa-agent">AGENT</span><span class="pa-role">ROLE</span><span class="pa-status">STATUS</span><span class="pa-hb">HB</span><span class="pa-cpu">CPU</span><span class="pa-mem">MEM</span><span class="pa-q">QUEUE</span></div>
-      <div id="partList" style="flex:1;overflow-y:auto"></div>
-    </div>
-
-    <!-- Agent Handoff Chat -->
-    <div class="chat-wrap">
-      <div class="ph"><span><span class="live-dot"></span>AGENT HANDOFF CHAT</span></div>
-      <div class="chat-msgs" id="chatMsgs"></div>
-      <div class="chat-input"><input type="text" placeholder="Type a message..." id="chatIn"><button id="chatSend">SEND</button></div>
-    </div>
-
-    <!-- Live Logs -->
-    <div class="logs-wrap">
-      <div class="ph"><span><span class="live-dot"></span>LIVE LOGS</span></div>
-      <div class="logs-controls">
-        <span class="lc-lbl">LEVEL:</span>
-        <select id="logFilter" style="background:var(--bg);border:1px solid var(--border);color:var(--ink);font-family:inherit;font-size:9px;padding:2px 4px;outline:none">
-          <option value="all">ALL</option><option value="inf">INF</option><option value="dbg">DBG</option><option value="wrn">WRN</option><option value="err">ERR</option>
-        </select>
-        <label><input type="checkbox" checked> SYS</label>
-        <label><input type="checkbox" checked> NET</label>
-        <label><input type="checkbox" checked> AGENT</label>
-        <label class="lc-auto"><input type="checkbox" checked id="autoScroll"> AUTO SCROLL</label>
-      </div>
-      <div style="flex:1;overflow-y:auto" id="logList"></div>
-    </div>
-
-    <!-- Telemetry -->
-    <div class="tele-wrap">
-      <div class="ph"><span><span class="live-dot"></span>TELEMETRY</span></div>
-      <div class="tele-time">
-        <button class="on">1M</button><button>5M</button><button>15M</button><button>1H</button><button>6H</button><button>24H</button>
-      </div>
-      <div class="tele-grid">
-        <div class="tele-card"><div class="tc-v" id="tcReq">1,842</div><div class="tc-l">REQUESTS / SEC</div><div class="tc-delta up">+12.4% +22.4%</div></div>
-        <div class="tele-card"><div class="tc-v" id="tcP95">23ms</div><div class="tc-l">P95 LATENCY</div><div class="tc-delta down">+8.1%</div></div>
-        <div class="tele-card"><div class="tc-v" id="tcErrRate" style="color:var(--red)">7</div><div class="tc-l">ERROR RATE</div><div class="tc-delta down">+75.0%</div></div>
-        <div class="tele-card"><div class="tc-v" id="tcSucc" style="color:var(--green)">98.6%</div><div class="tc-l">SUCCESS RATE</div><div class="tc-delta up">+8.7%</div></div>
-      </div>
-      <div class="tele-grid" style="border-top:none">
-        <div class="tele-card"><div class="tc-v">27</div><div class="tc-l">ACTIVE WORKFLOWS</div><div class="tc-delta up">+22.7%</div></div>
-        <div class="tele-card"><div class="tc-v">1.32M</div><div class="tc-l">TOTAL SNAPSHOTS</div><div class="tc-delta up">+18.9%</div></div>
-        <div class="tele-card"><div class="tc-v">241</div><div class="tc-l">QUEUE DEPTH</div><div class="tc-delta up">+15.3%</div></div>
-        <div class="tele-card"><div class="tc-v" style="color:var(--red)">0.38%</div><div class="tc-l">ERROR RATE</div><div class="tc-delta down">+0.13%</div></div>
-      </div>
-      <div class="tele-chart"><canvas id="teleChart"></canvas></div>
-    </div>
-
-    <!-- Risk / Safety Events -->
-    <div class="risk-wrap">
-      <div class="ph"><span><span class="live-dot"></span>RISK / SAFETY EVENTS</span></div>
-      <div class="risk-hdr"><span class="rh-time">TIME</span><span class="rh-rule">RULE</span><span class="rh-sev">SEVERITY</span><span class="rh-agent">AGENT</span><span class="rh-det">DETAILS</span></div>
-      <div class="risk-table" id="riskList"></div>
-      <div class="risk-footer"><span>VIEW ALL EVENTS (12)</span><span style="color:var(--accent)">></span></div>
-    </div>
-
-    <!-- Live Logs row 2 / Packet Inspector -->
-    <div class="pkt-wrap">
-      <div class="ph"><span>PACKET INSPECTOR</span><span class="ph-id" id="pktId">PKT ID: pkt_0143a7902f7</span></div>
-      <div class="pkt-body" id="pktBody">
-        <div><span class="pk">wf</span><span class="pv" id="pkWf">generic_review</span></div>
-        <div><span class="pk">ds</span><span class="pv" id="pkDs">research.collect</span></div>
-        <div><span class="pk">node</span><span class="pv" id="pkNode">draft</span></div>
-        <div><span class="pk">deny</span><span class="pv" id="pkDeny">0</span></div>
-        <div><span class="pk">in</span><span class="pv" id="pkIn">user_req_9821</span></div>
-        <div><span class="pk">risk</span><span class="pv" id="pkRisk" style="color:var(--yellow)">med</span></div>
-        <div><span class="pk">out</span><span class="pv" id="pkOut">DeepResearch</span></div>
-        <div><span class="pk">human</span><span class="pv" id="pkHuman" style="color:var(--green)">yes</span></div>
-      </div>
-      <div class="pkt-footer"><span>SIZE: 482B</span><span>SRC: Orchestrator</span><span>DST: DeepResearch</span><span>TIME: 14:45:07.186</span></div>
+    <div class="chat">
+      <div class="section-header"><span>AGENT HANDOFF CHAT</span><span class="live"><i class="status-dot"></i> LIVE</span></div>
+      <div class="chat-body"><div class="chat-list" id="chatList"></div><div class="composer"><input id="chatInput" placeholder="Type a message..."><button onclick="sendChat()">SEND</button></div></div>
     </div>
   </div>
+</section>
+<section class="panel logs">
+  <div class="panel-header"><span>LIVE LOGS</span><span class="live"><i class="status-dot"></i> STREAMING</span></div>
+  <div class="log-toolbar"><span>LEVEL: ALL</span><span>&#x2610; SYS</span><span>&#x2610; NET</span><span>&#x2611; AGENT</span><span style="color:var(--green)">&#x25CF; AUTO SCROLL</span></div>
+  <div class="log-view" id="logView"></div>
+</section>
+<section class="panel telemetry">
+  <div class="panel-header"><span>TELEMETRY</span></div>
+  <div class="telemetry-body">
+    <div class="tabs"><span class="active">1M</span><span>5M</span><span>15M</span><span>1H</span><span>6H</span><span>24H</span></div>
+    <div class="kpis">
+      <div class="kpi"><span>REQUESTS / SEC</span><b id="kReq">1,842</b><small>&#x2191; 12.4% &middot; 22.4%</small></div>
+      <div class="kpi"><span>P95 LATENCY</span><b id="kLat">23ms</b><small>&#x2193; 8.1%</small></div>
+      <div class="kpi bad"><span>BLOCKED HANDOFFS</span><b>7</b><small>&#x2191; 75.0%</small></div>
+      <div class="kpi"><span>SUCCESS RATE</span><b>98.6%</b><small>&#x2191; 0.7%</small></div>
+      <div class="kpi"><span>ACTIVE WORKFLOWS</span><b>27</b><small>&#x2191; 22.7%</small></div>
+      <div class="kpi"><span>TOTAL SNAPSHOTS</span><b>1.32M</b><small>&#x2191; 18.9%</small></div>
+      <div class="kpi"><span>QUEUE DEPTH (SUM)</span><b id="kQueue">241</b><small>&#x2191; 15.3%</small></div>
+      <div class="kpi bad"><span>ERROR RATE</span><b id="kErr">0.38%</b><small>&#x2191; 0.13%</small></div>
+    </div>
+    <div class="chart-wrap"><div class="chart-label">THROUGHPUT (PKTS / SEC)</div><canvas id="throughput"></canvas></div>
+  </div>
+</section>
+<section class="panel right-bottom">
+  <div class="events">
+    <div class="section-header"><span>RISK / SAFETY EVENTS</span><span class="live"><i class="status-dot"></i> LIVE</span></div>
+    <table>
+      <colgroup><col style="width:16%"><col style="width:12%"><col style="width:14%"><col style="width:23%"><col style="width:35%"></colgroup>
+      <thead><tr><th>TIME</th><th>RULE</th><th>SEVERITY</th><th>AGENT</th><th>DETAILS</th></tr></thead>
+      <tbody>
+        <tr><td>14:45:02</td><td style="color:var(--amber)">SG-2</td><td style="color:var(--amber)">MED</td><td>Safety Gate</td><td>untrusted_domain</td></tr>
+        <tr><td>14:44:58</td><td style="color:var(--amber)">SG-5</td><td style="color:var(--red)">HIGH</td><td>Safety Gate</td><td>pkt_injected</td></tr>
+        <tr><td>14:43:56</td><td style="color:var(--amber)">SG-1</td><td style="color:var(--cyan)">LOW</td><td>Validator</td><td>malformed_input</td></tr>
+        <tr><td>14:43:41</td><td style="color:var(--amber)">SG-3</td><td style="color:var(--amber)">MED</td><td>Safety Gate</td><td>tool_mismatch</td></tr>
+        <tr><td>14:43:12</td><td style="color:var(--amber)">SG-4</td><td style="color:var(--red)">HIGH</td><td>Executor A</td><td>prompt_injection</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="inspector">
+    <div class="inspector-head"><span>PACKET INSPECTOR</span><span>PKT ID: pkt_0143A7902E7</span></div>
+    <div class="packet-grid">
+      <div class="packet-section">
+        <div class="packet-row"><label>wf</label><span>generic_review</span></div>
+        <div class="packet-row"><label>mode</label><span>draft</span></div>
+        <div class="packet-row"><label>in</label><span>user_req_9821</span></div>
+        <div class="packet-row"><label>out</label><span>DeepResearch</span></div>
+      </div>
+      <div class="packet-section">
+        <div class="packet-row"><label>do</label><span>research.collect</span></div>
+        <div class="packet-row"><label>deny</label><span>0</span></div>
+        <div class="packet-row"><label>risk</label><span style="color:var(--green)">med</span></div>
+        <div class="packet-row"><label>human</label><span style="color:var(--green)">yes</span></div>
+      </div>
+    </div>
+    <div class="packet-foot"><span>SIZE: 482B</span><span>SRC: Orchestrator</span><span>DST: DeepResearch</span><span>TIME: 14:45:07.186</span></div>
+  </div>
+</section>
+</main>
 </div>
 
 <!-- ==================== DOCS VIEW ==================== -->
 <div id="docsView">
-  <div class="hdr">
-    <div class="logo">
-      <svg viewBox="0 0 24 24"><path d="M22 5.18L10.59 16.6l-4.24-4.24-1.41 1.41 5.66 5.66L23.41 6.59 22 5.18zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
-      <span class="txt">PIDGIN</span>
-      <span class="sub">// Agent Handoff Protocol</span>
-    </div>
-    <nav>
-      <button class="ti" data-view="dashView">DASHBOARD</button>
-      <button class="ti">AGENTS</button>
-      <button class="ti">NETWORK</button>
-      <button class="ti">SAFETY</button>
-      <button class="ti">TELEMETRY</button>
-      <button class="ti on">DOCS</button>
-      <button class="ti">CONFIG</button>
-    </nav>
-    <div class="right">
-      <div class="status-live"><span class="dot"></span>STATUS: LIVE</div>
-      <div class="env">ENV: LOCAL HOST</div>
-      <span class="ts-hdr" id="docsTs">2025-05-22 14:45:12 UTC</span>
-    </div>
+<header class="docs-top">
+  <div class="docs-brand"><strong>PIDGIN</strong><small>// Agent Handoff Protocol</small></div>
+  <nav>
+    <a onclick="showDash()">DASHBOARD</a><a>AGENTS</a><a>NETWORK</a><a>SAFETY</a><a>TELEMETRY</a><a class="active-nav">DOCS</a><a>CONFIG</a>
+  </nav>
+  <div class="statuses"><div class="chip">STATUS:&nbsp;<span class="green">LIVE <i class="status-dot"></i></span></div><div class="chip">ENV:&nbsp;<span class="green">LOCAL HOST</span></div><div class="chip" id="clock2">2025-05-22 14:45:12 UTC</div></div>
+</header>
+<div class="layout">
+<aside class="left">
+  <div class="search"><span>&#x2192;</span><input placeholder="Search docs..." id="docSearch"><span class="kbd">&#x2318;K</span></div>
+  <div class="side-title">PIDGIN DOCUMENTATION</div>
+  <div class="menu" id="docMenu">
+    <a class="active" data-page="overview"><span>&#x2302;</span><span>Overview</span></a>
+    <a data-page="install"><span>&#x25C7;</span><span>Install</span></a>
+    <a data-page="quickstart"><span>&#x2726;</span><span>Quick Start</span></a>
+    <a data-page="packet"><span>&#x25A1;</span><span>Packet Format</span></a>
+    <a data-page="commands"><span>&#x25A4;</span><span>Commands</span></a>
+    <a data-page="safety"><span>&#x2197;</span><span>Safety Rules</span></a>
+    <a data-page="multiagent"><span>&#x25A6;</span><span>Multi-Agent Setup</span></a>
+    <a data-page="langgraph"><span>&#x25C9;</span><span>LangGraph</span></a>
+    <a data-page="crewai"><span>&#x25C9;</span><span>CrewAI</span></a>
+    <a data-page="a2a"><span>&#x25C9;</span><span>A2A Integration</span></a>
+    <a data-page="hostconfig"><span>&#x25A3;</span><span>Host Config</span></a>
+    <a data-page="rustlib"><span>&#x2318;</span><span>Rust Library</span></a>
+    <a data-page="build"><span>&#x25B0;</span><span>Build from Source</span></a>
+    <a data-page="api"><span>&#x25A3;</span><span>API / SDK</span></a>
   </div>
+  <div class="help"><h3>NEED HELP?</h3><p>Join the community or<br>open an issue on GitHub.</p><a class="link">GitHub Repository &#x2197;</a><a class="link">Discord Community &#x2197;</a></div>
+  <div class="version"><h3>PIDGIN DOCS</h3><p>VERSION: v0.4.0</p><p>LAST UPDATED: 2025-05-21</p></div>
+</aside>
+<main class="main" id="docsMain">
 
-  <div class="docs-body">
-    <!-- Left sidebar -->
-    <div class="docs-side">
-      <div class="docs-search"><input type="text" placeholder="Search docs..." id="docSearch"></div>
-      <div class="docs-nav">
-        <div class="docs-section">PIDGIN DOCUMENTATION</div>
-        <div class="docs-item on" data-target="d-overview"><span class="di-icon">&#x1F3E0;</span> Overview</div>
-        <div class="docs-item" data-target="d-install"><span class="di-icon">&#x1F4E6;</span> Install</div>
-        <div class="docs-item" data-target="d-quickstart"><span class="di-icon">&#x26A1;</span> Quick Start</div>
-        <div class="docs-item" data-target="d-format"><span class="di-icon">&#x1F4CB;</span> Packet Format</div>
-        <div class="docs-item" data-target="d-commands"><span class="di-icon">&#x1F4AC;</span> Commands</div>
-        <div class="docs-item" data-target="d-safety"><span class="di-icon">&#x1F6E1;</span> Safety Rules</div>
-        <div class="docs-item" data-target="d-multi"><span class="di-icon">&#x1F916;</span> Multi-Agent Setup</div>
-        <div class="docs-item" data-target="d-langgraph"><span class="di-icon">&#x1F517;</span> LangGraph</div>
-        <div class="docs-item" data-target="d-crewai"><span class="di-icon">&#x1F465;</span> CrewAI</div>
-        <div class="docs-item" data-target="d-a2a"><span class="di-icon">&#x1F310;</span> A2A Integration</div>
-        <div class="docs-item" data-target="d-host"><span class="di-icon">&#x2699;</span> Host Config</div>
-        <div class="docs-item" data-target="d-rust"><span class="di-icon">&#x1F527;</span> Rust Library</div>
-        <div class="docs-item" data-target="d-build"><span class="di-icon">&#x1F528;</span> Build from Source</div>
-        <div class="docs-item" data-target="d-api"><span class="di-icon">&#x1F4E1;</span> API / SDK</div>
-      </div>
-      <div class="docs-help">
-        <div class="dh-title">NEED HELP?</div>
-        <p>Join the community or open an issue on GitHub.</p>
-        <a href="#">GitHub Repository &#x2197;</a>
-        <a href="#">Discord Community &#x2197;</a>
-      </div>
-      <div class="docs-ver">
-        <div class="dv-title">PIDGIN DOCS <span style="width:5px;height:5px;border-radius:50%;background:var(--green);display:inline-block"></span></div>
-        <div>VERSION: v0.4.0</div>
-        <div>LAST UPDATED: 2025-05-21</div>
-      </div>
-    </div>
+<!-- OVERVIEW -->
+<div class="doc-content-section active" id="page-overview">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Overview</span></div>
+  <section class="hero">
+    <div><h1>PIDGIN Docs</h1><h2>The Agent Handoff Protocol.</h2><p>PIDGIN standardizes how AI agents hand off work with safety, clarity, and control.<br>Small packets. Strong guarantees. Built for production.</p></div>
+    <div class="doc-panel what"><h3>WHAT IS PIDGIN?</h3><p>PIDGIN is a lightweight protocol for agent-to-agent handoffs. It defines a minimal packet format, strict safety rules, and a set of commands so agents can collaborate safely and predictably.</p><div class="mini-stats"><div>VERSION<b>0.4.0</b></div><div>LANGUAGE<b>Rust</b></div><div>LICENSE<b>Apache-2.0</b></div></div></div>
+  </section>
+  <section class="doc-panel cards">
+    <div class="card"><h3>DESIGNED FOR RELIABILITY</h3><p>Built-in safety gates (SG-1..SG-9), explicit do/deny controls, human oversight flags, and full audit logs.</p><a onclick="navTo('safety')">Explore Safety Rules &rarr;</a></div>
+    <div class="card"><h3>SIMPLE &amp; COMPOSABLE</h3><p>Tiny packets, clear lifecycle, and composable workflows that fit any agent stack or runtime.</p><a onclick="navTo('packet')">View Packet Format &rarr;</a></div>
+    <div class="card"><h3>PRODUCTION READY</h3><p>Rust core, async by default, metrics first, and ready for scale.</p><a onclick="navTo('install')">Install PIDGIN &rarr;</a></div>
+  </section>
+  <section class="mid">
+    <div class="doc-panel lifecycle"><div class="box-title">THE PIDGIN LIFECYCLE</div><div class="steps">
+      <div class="step"><div class="icon">&#x2315;</div><b>PARSE</b>Read &amp; decode<br>packet</div><div class="arrow">&rarr;</div>
+      <div class="step green-step"><div class="icon">&#x2713;</div><b>VALIDATE</b>Schema, fields,<br>types, signs</div><div class="arrow">&rarr;</div>
+      <div class="step amber-step"><div class="icon">&#x2B22;</div><b>SAFETY</b>SG-1..SG-9<br>enforcement</div><div class="arrow">&rarr;</div>
+      <div class="step green-step"><div class="icon">&#x2659;</div><b>RESOLVE</b>Approvals &amp;<br>overrides</div><div class="arrow">&rarr;</div>
+      <div class="step green-step"><div class="icon">&#x2197;</div><b>EXPAND</b>Plan steps &amp;<br>prepare work</div><div class="arrow">&rarr;</div>
+      <div class="step"><div class="icon">&#x25A4;</div><b>LOG</b>Aliases, metrics<br>&amp; audit trail</div>
+    </div></div>
+    <div class="doc-panel"><div class="box-title">SAMPLE PACKET</div><div class="code"><span class="key">wf</span>=<span class="val">generic_review</span><br><span class="key">mode</span>=draft<br><span class="key">do</span>=[draft,review]<br><span class="key">deny</span>=[publish,send,delete]<br><span class="key">risk</span>=med<br><span class="key">human</span>=yes<br><span class="key">user</span>=rq_9821<br><span class="key">out</span>=DeepResearch<br><span class="key">v</span>=1.0.0<br><span class="comment"># packet is signed and timestamped</span></div></div>
+  </section>
+  <section class="lower">
+    <div class="doc-panel"><div class="box-title">INSTALL</div><div class="codeblock"><span class="ln">01</span><span style="color:var(--green)"># Install from crates.io</span><br><span class="ln">02</span>cargo install pidgin-lang<br><br><span class="ln">04</span><span style="color:var(--green)"># Initialize a workspace</span><br><span class="ln">05</span>pgn init my-project<br><br><span class="ln">07</span><span style="color:var(--green)"># View docs in your terminal</span><br><span class="ln">08</span>pgn docs</div><div class="card"><a onclick="navTo('install')">See Install Guide &rarr;</a></div></div>
+    <div class="doc-panel"><div class="box-title">COMMANDS</div><table class="cmds"><colgroup><col style="width:22%"><col style="width:43%"><col style="width:35%"></colgroup><thead><tr><th>COMMAND</th><th>DESCRIPTION</th><th>EXAMPLE</th></tr></thead><tbody>
+      <tr><td>parse</td><td>Parse raw packet</td><td>pgn parse packet.pgn</td></tr><tr><td>validate</td><td>Validate packet</td><td>pgn validate packet.pgn</td></tr><tr><td>check</td><td>Run safety rules</td><td>pgn check packet.pgn</td></tr><tr><td>resolve</td><td>Resolve approvals</td><td>pgn resolve packet.pgn</td></tr><tr><td>expand</td><td>Expand execution plan</td><td>pgn expand packet.pgn</td></tr><tr><td>run</td><td>Execute workflow</td><td>pgn run plan.json</td></tr><tr><td>measure</td><td>Collect metrics</td><td>pgn measure --last</td></tr><tr><td>docs</td><td>Open documentation</td><td>pgn docs</td></tr>
+    </tbody></table><div class="card"><a onclick="navTo('commands')">Full Command Reference &rarr;</a></div></div>
+    <div class="doc-panel rules"><div class="box-title">SAFETY RULES (SG-1..SG-9)</div><div class="rulegrid"><div><span class="green">SG-1</span> Schema Validation</div><div><span class="green">SG-6</span> Risk Thresholds</div><div><span class="green">SG-2</span> Signature Verification</div><div><span class="green">SG-7</span> Human Control</div><div><span class="green">SG-3</span> Workflow Allowlist</div><div><span class="green">SG-8</span> Output Constraints</div><div><span class="green">SG-4</span> Mode Constraints</div><div><span class="green">SG-9</span> Audit Logging</div><div><span class="green">SG-5</span> Denylist Enforcement</div><div></div></div><p>All safety rules are enforced before execution.<br>No rule failure is allowed to pass.</p><a class="green" onclick="navTo('safety')">Read Safety Rules &rarr;</a></div>
+  </section>
+</div>
 
-    <!-- Main content -->
-    <div class="docs-main" id="docsMain">
-      <div class="docs-breadcrumb">Docs <span>></span> Overview</div>
-      <div class="docs-hero">
-        <h1><svg viewBox="0 0 24 24" width="28" height="28" fill="var(--accent)"><path d="M22 5.18L10.59 16.6l-4.24-4.24-1.41 1.41 5.66 5.66L23.41 6.59 22 5.18zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg> PIDGIN Docs</h1>
-        <h2>The Agent Handoff Protocol.</h2>
-        <p>PIDGIN standardizes how AI agents hand off work with safety, clarity, and control. Small packets. Strong guarantees. Built for production.</p>
-      </div>
+<!-- INSTALL -->
+<div class="doc-content-section" id="page-install">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Install</span></div>
+  <h2>INSTALLATION</h2>
+  <h3>Prerequisites</h3>
+  <p>PIDGIN requires Rust 1.75+ and Cargo. If you don't have Rust installed, use rustup:</p>
+  <pre>curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</pre>
+  <h3>Install from crates.io</h3>
+  <p>The fastest way to get PIDGIN. Installs the <code>pgn</code> CLI and the <code>pidgin-lang</code> library:</p>
+  <pre>cargo install pidgin-lang</pre>
+  <p>This installs the <code>pgn</code> binary to <code>~/.cargo/bin/</code>. Make sure this is in your PATH.</p>
+  <h3>Initialize a Workspace</h3>
+  <p>Create a new PIDGIN project with the standard directory structure:</p>
+  <pre>pgn init my-project
+cd my-project</pre>
+  <p>This creates:</p>
+  <ul>
+    <li><code>.pidgin/config.yaml</code> - Project configuration</li>
+    <li><code>.pidgin/safety_rules.yaml</code> - Custom safety rules</li>
+    <li><code>.pidgin/packets/</code> - Directory for .pgn packet files</li>
+    <li><code>.pidgin/aliases.yaml</code> - Reference alias definitions</li>
+  </ul>
+  <h3>Verify Installation</h3>
+  <pre>pgn --version
+pgn docs</pre>
+  <h3>Install from Source</h3>
+  <p>Clone the repository and build with Cargo:</p>
+  <pre>git clone https://github.com/pidgin-protocol/pidgin.git
+cd pidgin
+cargo build --release
+cargo install --path crates/pidgin-cli</pre>
+  <div class="note"><strong>Note:</strong> Building from source requires Rust 1.75+ and approximately 2 minutes on modern hardware.</div>
+  <h3>Platform Support</h3>
+  <table class="field-table">
+    <tr><th>Platform</th><th>Status</th><th>Notes</th></tr>
+    <tr><td>Linux (x86_64)</td><td>Fully Supported</td><td>Primary development platform</td></tr>
+    <tr><td>macOS (aarch64, x86_64)</td><td>Fully Supported</td><td>Native Apple Silicon support</td></tr>
+    <tr><td>Windows (x86_64)</td><td>Fully Supported</td><td>MSVC and GNU toolchains</td></tr>
+    <tr><td>Linux (aarch64)</td><td>Supported</td><td>Cross-compiled releases available</td></tr>
+  </table>
+</div>
 
-      <div class="docs-cards">
-        <div>
-          <div class="dc-title"><span class="dc-icon">&#x1F6E1;</span> DESIGNED FOR RELIABILITY</div>
-          <div class="dc-desc">Built-in safety gates (SG-1..SG-9), explicit do/deny controls, human oversight flags, and full audit logs.</div>
-          <a class="dc-link" href="#">Explore Safety Rules &rarr;</a>
-        </div>
-        <div>
-          <div class="dc-title"><span class="dc-icon">&#x2728;</span> SIMPLE &amp; COMPOSABLE</div>
-          <div class="dc-desc">Tiny packets, clear lifecycle, and composable workflows that fit any agent stack or runtime.</div>
-          <a class="dc-link" href="#">View Packet Format &rarr;</a>
-        </div>
-        <div>
-          <div class="dc-title"><span class="dc-icon">&#x26A1;</span> PRODUCTION READY</div>
-          <div class="dc-desc">Rust core, async by default, metrics first, and ready for scale.</div>
-          <a class="dc-link" href="#">Install PIDGIN &rarr;</a>
-        </div>
-      </div>
+<!-- QUICK START -->
+<div class="doc-content-section" id="page-quickstart">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Quick Start</span></div>
+  <h2>QUICK START</h2>
+  <p>Get up and running with PIDGIN in under 5 minutes. This guide walks you through creating your first agent-to-agent handoff.</p>
+  <h3>Step 1: Create a Packet</h3>
+  <p>Create a file called <code>hello.pgn</code> in your project:</p>
+  <pre>@run hello.world
+wf=code_review
+mode=draft
+in=[main.rs]
+out=[review]
+do=[read,analyze,report]
+deny=[publish,send,delete]
+risk=low
+human=no
+from=orchestrator
+to=executor_alpha</pre>
+  <h3>Step 2: Parse the Packet</h3>
+  <p>Parse the raw .pgn text into structured fields:</p>
+  <pre>pgn parse hello.pgn</pre>
+  <p>Output shows the parsed directive, run ID, field count, and any parse errors.</p>
+  <h3>Step 3: Validate</h3>
+  <p>Check that all required fields are present and types are correct:</p>
+  <pre>pgn validate hello.pgn</pre>
+  <h3>Step 4: Run Safety Checks</h3>
+  <p>Execute all 9 safety rules against the packet:</p>
+  <pre>pgn check hello.pgn</pre>
+  <p>If all rules pass, the packet is safe to execute. If any rule blocks, you'll see which rule fired and why.</p>
+  <h3>Step 5: Expand to Execution Plan</h3>
+  <p>Convert the packet into a YAML execution spec:</p>
+  <pre>pgn expand hello.pgn</pre>
+  <p>The expanded YAML includes resolved aliases, injected metadata, and the execution route.</p>
+  <h3>Step 6: Run the Workflow</h3>
+  <pre>pgn run hello.pgn</pre>
+  <p>This executes the full 7-stage pipeline: lex, parse, syntax, schema, safety, resolve, expand. The result is logged to your audit trail.</p>
+  <h3>Complete Example</h3>
+  <pre># One-shot: parse, validate, check, expand
+pgn check hello.pgn
 
-      <div class="docs-sections" id="d-overview">
-        <h2>THE PIDGIN LIFECYCLE</h2>
-        <div class="lifecycle">
-          <div class="lc-step"><div class="lc-icon">&#x1F50D;</div><div class="lc-label">PARSE</div><div class="lc-desc">Read &amp; decode packet</div></div>
-          <div class="lc-arrow">&rarr;</div>
-          <div class="lc-step"><div class="lc-icon">&#x2705;</div><div class="lc-label">VALIDATE</div><div class="lc-desc">Schema, fields, types, signs</div></div>
-          <div class="lc-arrow">&rarr;</div>
-          <div class="lc-step"><div class="lc-icon">&#x1F6E1;</div><div class="lc-label">SAFETY</div><div class="lc-desc">SG-1..SG-9 enforcement</div></div>
-          <div class="lc-arrow">&rarr;</div>
-          <div class="lc-step"><div class="lc-icon">&#x1F913;</div><div class="lc-label">RESOLVE</div><div class="lc-desc">Approvals &amp; overrides</div></div>
-          <div class="lc-arrow">&rarr;</div>
-          <div class="lc-step"><div class="lc-icon">&#x1F4E6;</div><div class="lc-label">EXPAND</div><div class="lc-desc">Plan steps &amp; prepare work</div></div>
-          <div class="lc-arrow">&rarr;</div>
-          <div class="lc-step"><div class="lc-icon">&#x1F4DD;</div><div class="lc-label">LOG</div><div class="lc-desc">Aliases, metrics &amp; audit trail</div></div>
-        </div>
+# Full pipeline execution
+pgn run hello.pgn
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
-          <div>
-            <h3>SAMPLE PACKET</h3>
-            <pre style="position:relative"><span class="k">@run</span> <span class="v">&lt;run_id&gt;</span>
-<span class="c">wf</span>=<span class="v">generic_review</span>
-<span class="c">mode</span>=<span class="v">draft</span>
-<span class="c">do</span>= [<span class="v">draft</span>,<span class="v">review</span>]
-<span class="c">deny</span>=[<span class="v">publish</span>,<span class="v">send</span>,<span class="v">delete</span>]
-<span class="c">risk</span>=<span class="v">med</span>
-<span class="c">human</span>=<span class="v">yes</span>
-<span class="c">user</span>=<span class="v">rg_9821</span>
-<span class="c">out</span>=<span class="v">DeepResearch</span>
-<span class="c">v</span>=<span class="v">1.0.0</span>
-<span class="d"># packet is signed and timestamped</span></pre>
-          </div>
-          <div>
-            <h3>INSTALL</h3>
-            <pre style="position:relative"><span class="d">01</span>   <span class="d"># Install from crates.io</span>     <span style="color:var(--muted);float:right">bash</span>
-<span class="d">02</span>   <span class="k">cargo</span> <span class="v">install</span> pidgin-lang
-<span class="d">03</span>
-<span class="d">04</span>   <span class="d"># Initialize a workspace</span>
-<span class="d">05</span>   <span class="k">pgn</span> <span class="v">init</span> my-project
-<span class="d">06</span>
-<span class="d">07</span>   <span class="d"># View docs in your terminal</span>
-<span class="d">08</span>   <span class="k">pgn</span> <span class="v">docs</span></pre>
-          </div>
-        </div>
+# View metrics from the last run
+pgn measure --last</pre>
+  <div class="note"><strong>Tip:</strong> Use <code>pgn docs</code> to open this documentation in your terminal at any time.</div>
+</div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
-          <div>
-            <h3>COMMANDS</h3>
-            <table class="cmd-table">
-              <tr><th>COMMAND</th><th>DESCRIPTION</th><th>EXAMPLE</th></tr>
-              <tr><td>parse</td><td>Parse raw packet</td><td>pgn parse packet.pgn</td></tr>
-              <tr><td>validate</td><td>Validate packet (schema, types, sign)</td><td>pgn validate packet.pgn</td></tr>
-              <tr><td>check</td><td>Run safety rules (SG-1..SG-9)</td><td>pgn check packet.pgn</td></tr>
-              <tr><td>resolve</td><td>Resolve approvals / overrides</td><td>pgn resolve packet.pgn</td></tr>
-              <tr><td>expand</td><td>Expand into execution plan</td><td>pgn expand packet.pgn</td></tr>
-              <tr><td>run</td><td>Execute workflow</td><td>pgn run plan.json</td></tr>
-              <tr><td>measure</td><td>Collect metrics &amp; generate report</td><td>pgn measure --last</td></tr>
-              <tr><td>docs</td><td>Open documentation</td><td>pgn docs</td></tr>
-            </table>
-            <a class="dc-link" href="#" style="display:inline-block;margin-top:8px">Full Command Reference &rarr;</a>
-          </div>
-          <div>
-            <h3>SAFETY RULES (SG-1..SG-9)</h3>
-            <div class="sg-grid">
-              <div class="sg-item"><span class="sg-name">SG-1</span><span class="sg-desc">Schema Validation</span></div>
-              <div class="sg-item"><span class="sg-name">SG-6</span><span class="sg-desc">Risk Thresholds</span></div>
-              <div class="sg-item"><span class="sg-name">SG-2</span><span class="sg-desc">Signature Verification</span></div>
-              <div class="sg-item"><span class="sg-name">SG-7</span><span class="sg-desc">Human Control</span></div>
-              <div class="sg-item"><span class="sg-name">SG-3</span><span class="sg-desc">Workflow Allowlist</span></div>
-              <div class="sg-item"><span class="sg-name">SG-8</span><span class="sg-desc">Output Constraints</span></div>
-              <div class="sg-item"><span class="sg-name">SG-4</span><span class="sg-desc">Mode Constraints</span></div>
-              <div class="sg-item"><span class="sg-name">SG-9</span><span class="sg-desc">Audit Logging</span></div>
-              <div class="sg-item"><span class="sg-name">SG-5</span><span class="sg-desc">Denylist Enforcement</span></div>
-            </div>
-            <p style="margin-top:8px">All safety rules are enforced before execution. No rule failure is allowed to pass.</p>
-            <a class="dc-link" href="#">Read Safety Rules &rarr;</a>
-          </div>
-        </div>
-      </div>
-    </div>
+<!-- PACKET FORMAT -->
+<div class="doc-content-section" id="page-packet">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Packet Format</span></div>
+  <h2>PACKET FORMAT</h2>
+  <p>Pidgin packets are plain-text key-value documents with a directive header. Every packet begins with a directive (like <code>@run</code>) followed by a run ID, then zero or more key=value fields.</p>
+  <h3>Anatomy</h3>
+  <pre>@directive run_id
+key=value
+key=[value1,value2]
+key="quoted string"</pre>
+  <h3>Directive</h3>
+  <p>The first line must start with <code>@</code> followed by the directive name and a run identifier:</p>
+  <table class="field-table">
+    <tr><th>Directive</th><th>Purpose</th><th>Example</th></tr>
+    <tr><td>@run</td><td>Execute a workflow</td><td>@run code.review</td></tr>
+    <tr><td>@result</td><td>Report task outcome</td><td>@result review.complete</td></tr>
+    <tr><td>@approval</td><td>Request human sign-off</td><td>@approval deploy.prod</td></tr>
+    <tr><td>@context</td><td>Request context transfer</td><td>@context design.spec</td></tr>
+  </table>
+  <h3>Required Fields</h3>
+  <table class="field-table">
+    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+    <tr><td>wf</td><td>string</td><td>Workflow identifier. Maps to a workflow definition in your config.</td></tr>
+    <tr><td>mode</td><td>draft | approval</td><td><code>draft</code> = auto-execute. <code>approval</code> = requires human sign-off.</td></tr>
+    <tr><td>in</td><td>array</td><td>Input resources. Supports <code>file:</code> prefix for file references.</td></tr>
+    <tr><td>out</td><td>array</td><td>Expected output identifiers.</td></tr>
+  </table>
+  <h3>Optional Fields</h3>
+  <table class="field-table">
+    <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+    <tr><td>do</td><td>array</td><td>[]</td><td>Allowed actions for this packet.</td></tr>
+    <tr><td>deny</td><td>array</td><td>[]</td><td>Denied actions. Checked by SG-5.</td></tr>
+    <tr><td>risk</td><td>low | med | crit</td><td>low</td><td>Risk level. Affects safety rules.</td></tr>
+    <tr><td>human</td><td>yes | no</td><td>no</td><td>Whether human oversight is required.</td></tr>
+    <tr><td>ttl</td><td>integer</td><td>24</td><td>Time-to-live in hours.</td></tr>
+    <tr><td>note</td><td>string</td><td>-</td><td>Free-text annotation.</td></tr>
+    <tr><td>v</td><td>string</td><td>1.0.0</td><td>Protocol version.</td></tr>
+  </table>
+  <h3>Handoff Fields</h3>
+  <table class="field-table">
+    <tr><th>Field</th><th>Type</th><th>Description</th></tr>
+    <tr><td>from</td><td>string</td><td>Source agent identifier.</td></tr>
+    <tr><td>to</td><td>string</td><td>Destination agent identifier.</td></tr>
+    <tr><td>chain</td><td>array</td><td>Ordered list of agents in the handoff chain.</td></tr>
+    <tr><td>handoff</td><td>forward | relay | delegate</td><td>Handoff mode. <code>forward</code> = pass unchanged, <code>relay</code> = process and re-wrap, <code>delegate</code> = full transfer.</td></tr>
+    <tr><td>reply_to</td><td>run_id</td><td>Reference to the originating run.</td></tr>
+    <tr><td>origin</td><td>run_id</td><td>Original run ID at chain start.</td></tr>
+  </table>
+  <h3>Context Transfer</h3>
+  <table class="field-table">
+    <tr><th>Field</th><th>Type</th><th>Limit</th><th>Description</th></tr>
+    <tr><td>context_file</td><td>array</td><td>Unlimited</td><td>File references using <code>file:</code> prefix.</td></tr>
+    <tr><td>context_id</td><td>string</td><td>Unlimited</td><td>Pointer to a context store.</td></tr>
+    <tr><td>context</td><td>string</td><td>4KB</td><td>Inline context text.</td></tr>
+    <tr><td>context_b64</td><td>string</td><td>1MB</td><td>Base64-encoded binary context.</td></tr>
+  </table>
+  <h3>Field Naming</h3>
+  <p>Field names must be alphanumeric with underscores. Reserved words: <code>directive</code>, <code>run_id</code>, <code>timestamp</code>, <code>signature</code>. Field values support these formats:</p>
+  <ul>
+    <li>Plain strings: <code>wf=code_review</code></li>
+    <li>Arrays: <code>in=[file:main.rs,file:lib.rs]</code></li>
+    <li>Quoted strings: <code>note="needs review by Friday"</code></li>
+    <li>Integers: <code>ttl=48</code></li>
+    <li>Booleans: <code>human=yes</code></li>
+  </ul>
+</div>
 
-    <!-- Right TOC -->
-    <div class="docs-toc">
-      <div class="dt-title">ON THIS PAGE,</div>
-      <div class="dt-item on">What is PIDGIN?</div>
-      <div class="dt-item">Lifecycle</div>
-      <div class="dt-item">Sample Packet</div>
-      <div class="dt-item">Install</div>
-      <div class="dt-item">Commands</div>
-      <div class="dt-item">Safety Rules</div>
-      <div class="dt-item">Next Steps</div>
-    </div>
-  </div>
+<!-- COMMANDS -->
+<div class="doc-content-section" id="page-commands">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Commands</span></div>
+  <h2>CLI COMMANDS</h2>
+  <p>The <code>pgn</code> command-line interface provides tools for parsing, validating, checking, and executing PIDGIN packets.</p>
+  <h3>pgn init</h3>
+  <p>Initialize a new PIDGIN workspace with default configuration files.</p>
+  <pre>pgn init [project-name]</pre>
+  <p>Creates <code>.pidgin/</code> directory with config, safety rules, aliases, and a packets directory.</p>
+  <h3>pgn parse</h3>
+  <p>Parse raw .pgn text into structured fields. Reports directive, run ID, field count, and any syntax errors.</p>
+  <pre>pgn parse packet.pgn
+pgn parse --json packet.pgn    # JSON output</pre>
+  <h3>pgn validate</h3>
+  <p>Validate that all required fields are present and types match expectations. Returns a list of validation errors (empty if valid).</p>
+  <pre>pgn validate packet.pgn
+pgn validate --strict packet.pgn   # fail on warnings</pre>
+  <h3>pgn check</h3>
+  <p>Run all safety rules (SG-1 through SG-9) against the packet. Returns pass/fail for each rule and overall verdict.</p>
+  <pre>pgn check packet.pgn
+pgn check --rules SG-1,SG-2 packet.pgn   # specific rules</pre>
+  <h3>pgn resolve</h3>
+  <p>Resolve reference aliases, inject metadata, and prepare the packet for expansion.</p>
+  <pre>pgn resolve packet.pgn</pre>
+  <h3>pgn expand</h3>
+  <p>Expand the packet into a complete YAML execution specification. Includes resolved routes, metadata, and timestamps.</p>
+  <pre>pgn expand packet.pgn
+pgn expand --output plan.json packet.pgn   # save to file</pre>
+  <h3>pgn run</h3>
+  <p>Execute the full 7-stage pipeline: lex, parse, syntax, schema, safety, resolve, expand. Logs results to the audit trail.</p>
+  <pre>pgn run packet.pgn
+pgn run --dry-run packet.pgn   # simulate only</pre>
+  <h3>pgn measure</h3>
+  <p>Collect and display metrics from packet processing. Shows latency, throughput, error rates, and safety rule statistics.</p>
+  <pre>pgn measure --last          # metrics from last run
+pgn measure --window 1h     # metrics from last hour
+pgn measure --output report.json</pre>
+  <h3>pgn docs</h3>
+  <p>Open the PIDGIN documentation in your default browser.</p>
+  <pre>pgn docs</pre>
+  <h3>pgn serve</h3>
+  <p>Start the PIDGIN HTTP server with the monitoring dashboard.</p>
+  <pre>pgn serve --bind 0.0.0.0:3847</pre>
+  <h3>Global Options</h3>
+  <table class="field-table">
+    <tr><th>Option</th><th>Description</th></tr>
+    <tr><td>--json</td><td>Output results as JSON</td></tr>
+    <tr><td>--quiet</td><td>Suppress non-error output</td></tr>
+    <tr><td>--verbose</td><td>Enable detailed logging</td></tr>
+    <tr><td>--config &lt;path&gt;</td><td>Use custom config file</td></tr>
+  </table>
+</div>
 
-  <div class="docs-footer">
-    <span>&copy; 2025 PIDGIN Project</span>
-    <span><a href="#">GitHub</a> | <a href="#">Documentation</a> | <a href="#">Changelog</a> | <a href="#">License</a> | <a href="#">Security</a></span>
-    <span>BUILT WITH &#x1F426; BY THE PIDGIN COMMUNITY</span>
-  </div>
+<!-- SAFETY RULES -->
+<div class="doc-content-section" id="page-safety">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Safety Rules</span></div>
+  <h2>SAFETY RULES (SG-1 through SG-9)</h2>
+  <p>PIDGIN enforces 9 safety rules on every packet before execution. No rule failure is allowed to pass. Rules are evaluated in order; the first failure blocks the packet.</p>
+  <div class="warning"><strong>Critical:</strong> Safety rules cannot be disabled or bypassed. They are hard-coded in the Rust core and evaluated on every pipeline run.</div>
+
+  <div class="rule-card"><span class="rule-id">SG-1</span><span class="rule-name">Schema Validation</span><p>Validates that the packet conforms to the expected schema. Checks field names, types, array formatting, and value ranges. Rejects packets with unknown fields in strict mode.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-2</span><span class="rule-name">Signature Verification</span><p>Verifies the packet signature against the signing key. Ensures the packet has not been tampered with in transit. Required for <code>mode=approval</code> packets.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-3</span><span class="rule-name">Workflow Allowlist</span><p>Checks that the <code>wf</code> field matches a known workflow in the project configuration. Blocks packets referencing undefined workflows.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-4</span><span class="rule-name">Mode Constraints</span><p>Enforces mode-specific rules: <code>approval</code> mode requires <code>human=yes</code>. <code>draft</code> mode cannot contain destructive actions in <code>do</code>.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-5</span><span class="rule-name">Denylist Enforcement</span><p>Checks that no action in the <code>deny</code> list also appears in the <code>do</code> list. If an action is both allowed and denied, the packet is blocked.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-6</span><span class="rule-name">Risk Thresholds</span><p>Enforces risk-level constraints: <code>crit</code> risk requires <code>human=yes</code> and <code>mode=approval</code>. <code>med</code> risk requires explicit <code>do</code> list.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-7</span><span class="rule-name">Human Control</span><p>Ensures human oversight for high-risk operations. Packets with <code>risk=crit</code> or destructive actions must have <code>human=yes</code>.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-8</span><span class="rule-name">Output Constraints</span><p>Validates that output identifiers in <code>out</code> are non-empty and don't reference restricted resources. Prevents data exfiltration.</p></div>
+
+  <div class="rule-card"><span class="rule-id">SG-9</span><span class="rule-name">Audit Logging</span><p>Ensures every packet generates an audit trail entry. Blocks packets that attempt to suppress logging or bypass the audit system.</p></div>
+
+  <h3>Rule Evaluation Order</h3>
+  <p>Rules are evaluated in numerical order (SG-1 through SG-9). This order is intentional:</p>
+  <ol>
+    <li><strong>SG-1 first:</strong> Schema validation must pass before any semantic checks.</li>
+    <li><strong>SG-2 second:</strong> Signature must be valid before checking content.</li>
+    <li><strong>SG-3..SG-8:</content checks in order of increasing specificity.</li>
+    <li><strong>SG-9 last:</strong> Audit logging is checked after all content rules.</li>
+  </ol>
+  <h3>Custom Rules</h3>
+  <p>Add custom rules in <code>.pidgin/safety_rules.yaml</code>:</p>
+  <pre>custom_rules:
+  - id: CR-1
+    name: "No production secrets"
+    check: "deny contains 'secrets' or 'credentials'"
+    severity: high
+    action: block</pre>
+</div>
+
+<!-- MULTI-AGENT SETUP -->
+<div class="doc-content-section" id="page-multiagent">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Multi-Agent Setup</span></div>
+  <h2>MULTI-AGENT SETUP</h2>
+  <p>PIDGIN supports complex multi-agent workflows where packets are handed off between agents in a chain. Each agent has its own identity, capabilities, and safety profile.</p>
+  <h3>Agent Configuration</h3>
+  <p>Define agents in <code>.pidgin/config.yaml</code>:</p>
+  <pre>agents:
+  orchestrator:
+    role: orchestrator
+    model: claude-3.5-sonnet
+    capabilities: [parse, route, delegate, context_resolve]
+    max_chain_depth: 5
+
+  executor_alpha:
+    role: executor
+    model: gpt-4o
+    capabilities: [code_review, draft, expand, file_read]
+    trusted_by: [orchestrator]
+
+  executor_beta:
+    role: executor
+    model: claude-3-haiku
+    capabilities: [validate, check, resolve]
+    trusted_by: [orchestrator]
+
+  human_approver:
+    role: approver
+    model: null
+    capabilities: [approve, reject, override]</pre>
+  <h3>Handoff Modes</h3>
+  <table class="field-table">
+    <tr><th>Mode</th><th>Description</th><th>Use Case</th></tr>
+    <tr><td>forward</td><td>Pass packet unchanged to next agent</td><td>Simple routing, no processing</td></tr>
+    <tr><td>relay</td><td>Agent processes and re-wraps the packet</td><td>Intermediate processing steps</td></tr>
+    <tr><td>delegate</td><td>Full transfer of responsibility</td><td>Agent takes ownership of the task</td></tr>
+  </table>
+  <h3>Chain Depth</h3>
+  <p>The <code>chain</code> field tracks the path of agents the packet has visited. SG-10 (chain depth exceeded) fires when the chain exceeds the configured maximum (default: 5). This prevents infinite loops in agent handoffs.</p>
+  <pre>chain=[orchestrator,executor_alpha,executor_beta]
+handoff=relay
+origin=code.review.001</pre>
+  <h3>Trust Relationships</h3>
+  <p>Agents can only receive packets from agents listed in their <code>trusted_by</code> field. This prevents unauthorized agents from injecting packets into a workflow.</p>
+</div>
+
+<!-- LANGGRAPH -->
+<div class="doc-content-section" id="page-langgraph">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">LangGraph</span></div>
+  <h2>LANGGRAPH INTEGRATION</h2>
+  <p>PIDGIN integrates with LangGraph to provide safety-gated agent handoffs in LangChain-based workflows.</p>
+  <h3>Setup</h3>
+  <pre>pip install pidgin-langchain</pre>
+  <h3>Usage</h3>
+  <pre>from pidgin_langchain import PidginNode
+
+# Add PIDGIN safety checks to your LangGraph workflow
+graph = StateGraph(AgentState)
+graph.add_node("pidgin_check", PidginNode(
+    rules=["SG-1", "SG-2", "SG-5", "SG-6"],
+    on_block="reject"
+))
+graph.add_edge("llm_call", "pidgin_check")
+graph.add_conditional_edges("pidgin_check", route_by_safety)</pre>
+  <h3>Configuration</h3>
+  <p>The LangGraph integration reads your <code>.pidgin/config.yaml</code> automatically. You can override settings per-node:</p>
+  <pre>PidginNode(
+    config_path=".pidgin/config.yaml",
+    rules=["SG-1", "SG-2"],        # subset of rules
+    strict=False,                    # allow warnings
+    timeout_ms=5000                  # per-check timeout
+)</pre>
+</div>
+
+<!-- CREWAI -->
+<div class="doc-content-section" id="page-crewai">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">CrewAI</span></div>
+  <h2>CREWAI INTEGRATION</h2>
+  <p>PIDGIN provides safety-gated handoffs for CrewAI multi-agent crews. Each task handoff passes through the full PIDGIN pipeline.</p>
+  <h3>Setup</h3>
+  <pre>pip install pidgin-crewai</pre>
+  <h3>Usage</h3>
+  <pre>from pidgin_crewai import PidginCrew
+
+crew = PidginCrew(
+    agents=[researcher, writer, reviewer],
+    safety_rules=["SG-1", "SG-5", "SG-7"],
+    on_block="log_and_continue"
+)
+
+result = crew.kickoff(inputs={"topic": "AI safety"})</pre>
+  <h3>How It Works</h3>
+  <ul>
+    <li>Each agent task generates a .pgn packet before execution.</li>
+    <li>The packet is validated through the PIDGIN pipeline.</li>
+    <li>If safety rules pass, the task executes normally.</li>
+    <li>If a rule blocks, the crew logs the block and can either halt or skip the task.</li>
+  </ul>
+</div>
+
+<!-- A2A INTEGRATION -->
+<div class="doc-content-section" id="page-a2a">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">A2A Integration</span></div>
+  <h2>A2A (AGENT-TO-AGENT) INTEGRATION</h2>
+  <p>PIDGIN implements the A2A protocol for standardized agent-to-agent communication across different frameworks and platforms.</p>
+  <h3>Protocol</h3>
+  <p>A2A uses PIDGIN packets as the wire format. Any agent that speaks PIDGIN can communicate with any other PIDGIN-speaking agent, regardless of the underlying framework.</p>
+  <h3>Endpoint</h3>
+  <pre>POST /a2a/handoff
+Content-Type: text/plain
+
+@run agent.handoff
+wf=collaborative_task
+mode=draft
+from=agent_alpha
+to=agent_beta
+in=[task_data]
+out=[result]</pre>
+  <h3>Discovery</h3>
+  <p>Agents announce their capabilities via the <code>/a2a/capabilities</code> endpoint:</p>
+  <pre>GET /a2a/capabilities
+{
+  "agent": "executor_alpha",
+  "capabilities": ["code_review", "draft", "expand"],
+  "accepted_directives": ["@run", "@result"],
+  "max_chain_depth": 5
+}</pre>
+</div>
+
+<!-- HOST CONFIG -->
+<div class="doc-content-section" id="page-hostconfig">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Host Config</span></div>
+  <h2>HOST CONFIGURATION</h2>
+  <p>PIDGIN reads configuration from <code>.pidgin/config.yaml</code> in your project root. This file controls agent definitions, safety rules, workflow mappings, and runtime behavior.</p>
+  <h3>Full Config Reference</h3>
+  <pre># .pidgin/config.yaml
+version: "0.4.0"
+
+server:
+  host: "0.0.0.0"
+  port: 3847
+  metrics_enabled: true
+
+agents:
+  default:
+    role: executor
+    model: gpt-4o
+    max_chain_depth: 5
+    capabilities: []
+
+safety:
+  rules:
+    - SG-1
+    - SG-2
+    - SG-3
+    - SG-4
+    - SG-5
+    - SG-6
+    - SG-7
+    - SG-8
+    - SG-9
+  custom_rules_path: ".pidgin/safety_rules.yaml"
+  strict_mode: false
+
+workflows:
+  code_review:
+    description: "Code review workflow"
+    required_fields: [wf, mode, in, out]
+    optional_fields: [do, deny, risk, human]
+
+logging:
+  level: info
+  audit_trail: true
+  output_path: ".pidgin/logs/"
+
+aliases:
+  path: ".pidgin/aliases.yaml"
+  auto_resolve: true</pre>
+  <h3>Environment Variables</h3>
+  <table class="field-table">
+    <tr><th>Variable</th><th>Description</th><th>Default</th></tr>
+    <tr><td>PIDGIN_CONFIG</td><td>Path to config file</td><td>.pidgin/config.yaml</td></tr>
+    <tr><td>PIDGIN_HOST</td><td>Server bind host</td><td>0.0.0.0</td></tr>
+    <tr><td>PIDGIN_PORT</td><td>Server bind port</td><td>3847</td></tr>
+    <tr><td>PIDGIN_LOG_LEVEL</td><td>Log verbosity</td><td>info</td></tr>
+  </table>
+</div>
+
+<!-- RUST LIBRARY -->
+<div class="doc-content-section" id="page-rustlib">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Rust Library</span></div>
+  <h2>RUST LIBRARY</h2>
+  <p>The <code>pidgin-lang</code> crate provides the core protocol implementation in Rust. Use it to build custom tools, integrations, or embed PIDGIN in your own applications.</p>
+  <h3>Add Dependency</h3>
+  <pre>[dependencies]
+pidgin-lang = "0.4.0"</pre>
+  <h3>Basic Usage</h3>
+  <pre>use pidgin_lang::{parse, validate, check, expand};
+
+fn main() {
+    let packet = "@run code.review\nwf=generic_review\nmode=draft\nin=[main.rs]\nout=[review]";
+
+    // Parse
+    let parsed = parse(packet).expect("parse failed");
+    println!("Directive: {}", parsed.directive);
+    println!("Fields: {}", parsed.fields.len());
+
+    // Validate
+    let errors = validate(&parsed);
+    if !errors.is_empty() {
+        eprintln!("Validation failed: {:?}", errors);
+        return;
+    }
+
+    // Safety check
+    let safety = check(&parsed);
+    if safety.blocked {
+        eprintln!("Blocked by: {:?}", safety.fired_rules);
+        return;
+    }
+
+    // Expand
+    let plan = expand(&parsed).expect("expand failed");
+    println!("YAML:\n{}", plan.yaml);
+}</pre>
+  <h3>API Reference</h3>
+  <table class="field-table">
+    <tr><th>Function</th><th>Signature</th><th>Returns</th></tr>
+    <tr><td>parse</td><td><code>fn parse(input: &str) -&gt; Result&lt;Packet&gt;</code></td><td>Parsed packet with directive, run_id, fields</td></tr>
+    <tr><td>validate</td><td><code>fn validate(packet: &amp;Packet) -&gt; Vec&lt;Error&gt;</code></td><td>List of validation errors (empty = valid)</td></tr>
+    <tr><td>check</td><td><code>fn check(packet: &amp;Packet) -&gt; SafetyResult</code></td><td>Safety verdict with fired rules</td></tr>
+    <tr><td>expand</td><td><code>fn expand(packet: &amp;Packet) -&gt; Result&lt;Plan&gt;</code></td><td>YAML execution spec with route</td></tr>
+    <tr><td>resolve</td><td><code>fn resolve(packet: &amp;Packet, aliases: &amp;Aliases) -&gt; Packet</code></td><td>Packet with resolved aliases</td></tr>
+  </table>
+</div>
+
+<!-- BUILD FROM SOURCE -->
+<div class="doc-content-section" id="page-build">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">Build from Source</span></div>
+  <h2>BUILD FROM SOURCE</h2>
+  <h3>Requirements</h3>
+  <ul>
+    <li>Rust 1.75+ (stable)</li>
+    <li>Cargo (included with Rust)</li>
+    <li>Git</li>
+  </ul>
+  <h3>Clone and Build</h3>
+  <pre>git clone https://github.com/pidgin-protocol/pidgin.git
+cd pidgin
+
+# Debug build (faster compile, slower runtime)
+cargo build
+
+# Release build (optimized)
+cargo build --release
+
+# Run tests
+cargo test --workspace
+
+# Run clippy
+cargo clippy --workspace -- -D warnings</pre>
+  <h3>Project Structure</h3>
+  <pre>pidgin/
+  crates/
+    pidgin-lang/     # Core library (parse, validate, check, expand)
+    pidgin-cli/      # CLI binary (pgn)
+    pidgin-server/   # HTTP server + dashboard
+  configs/
+    SAFETY_RULES.yaml
+  docs/
+    SPEC.md</pre>
+  <h3>Install Locally</h3>
+  <pre>cargo install --path crates/pidgin-cli</pre>
+</div>
+
+<!-- API / SDK -->
+<div class="doc-content-section" id="page-api">
+  <div class="crumb">Docs&nbsp; &#x203A; &nbsp;<span class="green">API / SDK</span></div>
+  <h2>API REFERENCE</h2>
+  <p>The PIDGIN HTTP server exposes a REST API for packet processing. All endpoints accept raw .pgn text and return JSON responses.</p>
+  <h3>Base URL</h3>
+  <pre>http://localhost:3847/api/v1</pre>
+  <h3>Endpoints</h3>
+  <table class="field-table">
+    <tr><th>Method</th><th>Path</th><th>Description</th></tr>
+    <tr><td>POST</td><td>/parse</td><td>Parse raw .pgn text into structured fields</td></tr>
+    <tr><td>POST</td><td>/validate</td><td>Validate packet fields and types</td></tr>
+    <tr><td>POST</td><td>/check</td><td>Run safety rules against packet</td></tr>
+    <tr><td>POST</td><td>/expand</td><td>Expand packet into YAML execution plan</td></tr>
+    <tr><td>POST</td><td>/run</td><td>Execute full pipeline (parse through expand)</td></tr>
+    <tr><td>GET</td><td>/health</td><td>Health check endpoint</td></tr>
+  </table>
+  <h3>POST /api/v1/parse</h3>
+  <pre>curl -X POST http://localhost:3847/api/v1/parse \
+  -H "Content-Type: text/plain" \
+  -d "@run test
+wf=generic_review
+mode=draft
+in=[main.rs]
+out=[review]"</pre>
+  <h3>Response Format</h3>
+  <pre>{
+  "ok": true,
+  "data": {
+    "directive": "run",
+    "run_id": "test",
+    "field_count": 4,
+    "fields": { "wf": "generic_review", "mode": "draft", ... }
+  }
+}</pre>
+  <h3>POST /api/v1/check</h3>
+  <p>Returns safety rule evaluation results:</p>
+  <pre>{
+  "ok": true,
+  "data": {
+    "safety": {
+      "blocked": false,
+      "fired_rules": ["SG-1", "SG-3", "SG-5"],
+      "passed_rules": ["SG-2", "SG-4", "SG-6", "SG-7", "SG-8", "SG-9"]
+    },
+    "resolution": [
+      { "original": "agent_alpha", "resolved": "agent_alpha", "status": "RESOLVED" }
+    ]
+  }
+}</pre>
+  <h3>Error Responses</h3>
+  <pre>{
+  "ok": false,
+  "error": "SG-5 blocked: action 'publish' in both do and deny lists"
+}</pre>
+  <div class="note"><strong>Note:</strong> The API is designed for machine-to-machine communication. For human interaction, use the CLI or the dashboard.</div>
+</div>
+
+</main>
+<aside class="right-toc"><h3>ON THIS PAGE</h3><div class="toc" id="tocList"><a class="active">What is PIDGIN?</a><a>Lifecycle</a><a>Sample Packet</a><a>Install</a><a>Commands</a><a>Safety Rules</a><a>Next Steps</a></div></aside>
+</div>
+<footer><span>&copy; 2025 PIDGIN Project</span><span>|</span><span>GitHub</span><span>|</span><span>Documentation</span><span>|</span><span>Changelog</span><span>|</span><span>License</span><span>|</span><span>Security</span><span style="margin-left:auto">BUILT BY THE PIDGIN COMMUNITY</span></footer>
 </div>
 
 <script>
-(function(){
-  var $=function(id){return document.getElementById(id)};
+// ===== VIEW SWITCHING =====
+function showDocs(){document.getElementById('dashView').classList.add('hide');document.getElementById('docsView').classList.add('show')}
+function showDash(){document.getElementById('dashView').classList.remove('hide');document.getElementById('docsView').classList.remove('show')}
 
-  // ===== VIEW SWITCHING =====
-  var navItems=document.querySelectorAll('.hdr nav .ti');
-  for(var i=0;i<navItems.length;i++){
-    navItems[i].onclick=function(){
-      var view=this.getAttribute('data-view');
-      if(view){
-        for(var j=0;j<navItems.length;j++)navItems[j].classList.remove('on');
-        this.classList.add('on');
-        $('dashView').className=view==='dashView'?'show':'';
-        $('docsView').className=view==='docsView'?'show':'';
-      }
-    };
-  }
-  $('btnDashView').onclick=function(){$('dashView').className='show';$('docsView').className=''};
+// ===== CLOCK =====
+function updateClock(){const d=new Date();const s=d.toISOString().replace('T',' ').slice(0,19)+' UTC';const c1=document.getElementById('clock');const c2=document.getElementById('clock2');if(c1)c1.textContent=s;if(c2)c2.textContent=s}
+setInterval(updateClock,1000);updateClock();
 
-  // docs nav
-  var docsItems=document.querySelectorAll('.docs-item');
-  for(var i=0;i<docsItems.length;i++){
-    docsItems[i].onclick=function(){
-      for(var j=0;j<docsItems.length;j++)docsItems[j].classList.remove('on');
-      this.classList.add('on');
-    };
-  }
+// ===== UPTIME =====
+let uptime=3*3600+15*60+27;
+setInterval(()=>{
+  uptime++;document.getElementById('mUp').textContent=[Math.floor(uptime/3600),Math.floor(uptime%3600/60),uptime%60].map(v=>String(v).padStart(2,'0')).join(':');
+  const p=1180+Math.floor(Math.random()*170),lat=20+Math.floor(Math.random()*8);
+  document.getElementById('mPps').textContent=p.toLocaleString();document.getElementById('kReq').textContent=(p+500+Math.floor(Math.random()*180)).toLocaleString();
+  document.getElementById('mLat').textContent=lat+'ms';document.getElementById('kLat').textContent=lat+'ms';document.getElementById('mHandoff').textContent=410+Math.floor(Math.random()*18);
+  document.getElementById('kQueue').textContent=235+Math.floor(Math.random()*17);document.getElementById('completed').textContent=(1234+Math.floor(Math.random()*6)).toLocaleString();
+  incoming.shift();incoming.push(.42+Math.random()*.25);outgoing.shift();outgoing.push(.25+Math.random()*.23);drawChart();
+  const edge=edgeData[Math.floor(Math.random()*edgeData.length)];edges.update({id:edge.id,label:(Number(edge.rate.replace('/s',''))+Math.floor(Math.random()*18-9))+'/s'});
+},1000);
 
-  // docs toc
-  var tocItems=document.querySelectorAll('.docs-toc .dt-item');
-  for(var i=0;i<tocItems.length;i++){
-    tocItems[i].onclick=function(){
-      for(var j=0;j<tocItems.length;j++)tocItems[j].classList.remove('on');
-      this.classList.add('on');
-    };
-  }
+// ===== VIS-NETWORK GRAPH =====
+const C={green:'#72f238',cyan:'#24d7ed',amber:'#ffb000',red:'#ff4b34',purple:'#b66cff',gray:'#b7c1bd',bg:'#081012'};
+const nodeData=[
+ {id:1,label:'Orchestrator\n18.0.0.2:9000\n\u2191 7.24k \u00B7 \u2193 7.91k',group:'green',kind:'agent',x:0,y:-250,fixed:{x:false,y:false}},
+ {id:2,label:'Pidgin Runtime\n18.0.0.2:8201\n\u2191 1.32k \u00B7 \u2193 1.04k',group:'cyan',kind:'agent',x:-270,y:-105},
+ {id:3,label:'Safety Gate\n18.0.0.2:7001\n\u2191 2.93k \u00B7 \u2193 3.12k',group:'amber',kind:'agent',x:0,y:-105},
+ {id:4,label:'Memory Archivist\n18.0.0.2:8300\n\u2191 0.61k \u00B7 \u2193 0.81k',group:'cyan',kind:'agent',x:270,y:-105},
+ {id:5,label:'DeepResearch\n18.0.0.2:7100\n\u2191 1.04k \u00B7 \u2193 1.19k',group:'cyan',kind:'agent',x:-270,y:55},
+ {id:6,label:'Executor A\n18.0.0.2:7200\n\u2191 2.74k \u00B7 \u2193 2.01k',group:'cyan',kind:'agent',x:0,y:55},
+ {id:7,label:'Executor B\n18.0.0.2:7201\n\u2191 0.92k \u00B7 \u2193 0.95k',group:'cyan',kind:'agent',x:270,y:55},
+ {id:8,label:'Human Approval\n18.0.0.2:9002\n\u2191 1.32k \u00B7 \u2193 1.97k',group:'amber',kind:'agent',x:0,y:205},
+ {id:9,label:'Outpost\n18.0.0.0:6201\n\u2191 0.81k \u00B7 \u2193 0.55k',group:'purple',kind:'infra',x:-270,y:335},
+ {id:10,label:'Redis\n18.0.0.10:6379\n\u2191 3.18k \u00B7 \u2193 3.91k',group:'red',kind:'infra',x:0,y:335},
+ {id:11,label:'Logger\n18.0.0.15:12000\n\u2191 9.10k \u00B7 \u2193 9.50k',group:'gray',kind:'infra',x:270,y:335}
+];
+const edgeData=[
+ {id:'e1',from:1,to:2,color:C.green,rate:'714/s'},{id:'e2',from:1,to:3,color:C.green,rate:'625/s'},{id:'e3',from:1,to:4,color:C.cyan,rate:'382/s'},
+ {id:'e4',from:2,to:5,color:C.cyan,rate:'280/s'},{id:'e5',from:3,to:5,color:C.green,rate:'520/s'},{id:'e6',from:3,to:6,color:C.green,rate:'640/s'},
+ {id:'e7',from:3,to:7,color:C.cyan,rate:'370/s'},{id:'e8',from:4,to:6,color:C.cyan,rate:'296/s'},{id:'e9',from:5,to:6,color:C.green,rate:'580/s'},
+ {id:'e10',from:6,to:7,color:C.green,rate:'740/s'},{id:'e11',from:5,to:8,color:C.amber,rate:'124/s'},{id:'e12',from:6,to:8,color:C.amber,rate:'92/s'},
+ {id:'e13',from:7,to:8,color:C.amber,rate:'110/s'},{id:'e14',from:5,to:9,color:C.purple,rate:'88/s'},{id:'e15',from:8,to:10,color:C.red,rate:'310/s'},
+ {id:'e16',from:7,to:11,color:C.gray,rate:'598/s'},{id:'e17',from:2,to:7,color:C.green,rate:'544/s'},{id:'e18',from:4,to:5,color:C.cyan,rate:'210/s'}
+];
+const groups={};
+Object.entries(C).forEach(([k,v])=>{if(k==='bg')return;groups[k]={color:{border:v,background:'#081012',highlight:{border:'#fff',background:'#10191c'},hover:{border:'#fff',background:'#0d1518'}},font:{color:'#dce3e0',face:getComputedStyle(document.documentElement).getPropertyValue('--font'),size:12,multi:false},shape:'box',margin:12,borderWidth:1.4,shadow:{enabled:true,color:v,size:9,x:0,y:0}}});
+const nodes=new vis.DataSet(nodeData), edges=new vis.DataSet(edgeData.map(e=>({...e,arrows:{to:{enabled:true,scaleFactor:.65}},width:1.5,dashes:[7,6],smooth:{type:'dynamic',roundness:.15},font:{color:e.color,size:8,strokeWidth:0},label:e.rate})));
+const network=new vis.Network(document.getElementById('network'),{nodes,edges},{
+ groups,autoResize:true,interaction:{hover:true,dragNodes:true,dragView:true,zoomView:true,tooltipDelay:100},
+ physics:{enabled:true,solver:'forceAtlas2Based',forceAtlas2Based:{gravitationalConstant:-65,centralGravity:.008,springLength:150,springConstant:.035,damping:.5},stabilization:{iterations:220,updateInterval:25,fit:true}},
+ layout:{improvedLayout:true},edges:{chosen:true,selectionWidth:2},nodes:{chosen:true}
+});
+network.once('stabilizationIterationsDone',()=>{network.setOptions({physics:false});network.fit({animation:{duration:450,easingFunction:'easeInOutQuad'}})});
+network.on('selectNode',p=>{const n=nodes.get(p.nodes[0]);document.getElementById('graphTip').textContent=n.label.replace(/\n/g,'  |  ')});
+network.on('selectEdge',p=>{const e=edges.get(p.edges[0]);document.getElementById('graphTip').textContent='FLOW '+e.from+' \u2192 '+e.to+'  |  '+e.label});
+document.getElementById('fitGraph').onclick=()=>network.fit({animation:true});
+document.getElementById('stabilizeGraph').onclick=()=>{network.setOptions({physics:true});network.stabilize(180);setTimeout(()=>network.setOptions({physics:false}),1500)};
+document.getElementById('layoutSelect').onchange=e=>{
+ if(e.target.value==='hierarchical'){network.setOptions({layout:{hierarchical:{enabled:true,direction:'UD',sortMethod:'directed',levelSeparation:110,nodeSpacing:155}},physics:false});network.fit({animation:true})}
+ else{network.setOptions({layout:{hierarchical:{enabled:false}},physics:true});network.stabilize(180);setTimeout(()=>network.setOptions({physics:false}),1500)}
+};
+document.getElementById('filterSelect').onchange=e=>{
+ const v=e.target.value;
+ nodeData.forEach(n=>nodes.update({id:n.id,hidden:v==='all'?false:v==='agents'?n.kind!=='agent':n.kind!=='infra'}));
+ edgeData.forEach(ed=>{const a=nodeData.find(n=>n.id===ed.from),b=nodeData.find(n=>n.id===ed.to);edges.update({id:ed.id,hidden:v==='all'?false:v==='agents'?(a.kind!=='agent'||b.kind!=='agent'):(a.kind!=='infra'||b.kind!=='infra')})});
+ network.fit({animation:true});
+};
 
-  // ===== TIMESTAMP =====
-  function updateTs(){
-    var n=new Date();
-    var s=n.getUTCFullYear()+'-'+String(n.getUTCMonth()+1).padStart(2,'0')+'-'+String(n.getUTCDate()).padStart(2,'0')+' '+String(n.getUTCHours()).padStart(2,'0')+':'+String(n.getUTCMinutes()).padStart(2,'0')+':'+String(n.getUTCSeconds()).padStart(2,'0')+' UTC';
-    if($('hdrTs'))$('hdrTs').textContent=s;
-    if($('docsTs'))$('docsTs').textContent=s;
-  }
-  setInterval(updateTs,1000);updateTs();
+// ===== PIPELINE =====
+const stages=[['PARSE','OK','1,842','7ms'],['VALIDATE','OK','1,832','8ms'],['SAFETY','SG-2 BLOCKED','1,821','12ms'],['RESOLVE','OK','1,783','9ms'],['EXPAND','OK','1,752','15ms'],['EXECUTE','OK','1,681','23ms'],['LOG','OK','1,842','7ms']];
+document.getElementById('stages').innerHTML=stages.map((s,i)=>'<div class="stage '+(i===2?'warn':'')+'"><div class="stage-num">'+(i+1)+'</div><b>'+s[0]+'</b><span class="stage-status">\u25CF '+s[1]+'</span><span>'+s[2]+'</span><canvas class="spark" width="120" height="22" data-warn="'+(i===2)+'"></canvas></div>').join('');
+function drawSparks(){document.querySelectorAll('.spark').forEach(c=>{const r=c.getBoundingClientRect(),dpr=window.devicePixelRatio||1;c.width=Math.max(90,Math.floor(r.width*dpr));c.height=Math.max(22,Math.floor(r.height*dpr));const x=c.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,r.width,r.height);x.strokeStyle=c.dataset.warn==='true'?C.amber:C.green;x.lineWidth=1;x.beginPath();const pts=28;for(let i=0;i<pts;i++){const px=i*(r.width/(pts-1));const py=4+Math.random()*Math.max(7,r.height-8);i?x.lineTo(px,py):x.moveTo(px,py)}x.stroke()})}
+drawSparks();
 
-  // ===== UPTIME =====
-  var t0=Date.now();
-  setInterval(function(){
-    var s=Math.floor((Date.now()-t0)/1000),m=Math.floor(s/60),h=Math.floor(m/60);
-    var txt=h?String(h).padStart(2,'0')+':'+String(m%60).padStart(2,'0')+':'+String(s%60).padStart(2,'0'):String(m).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
-    if($('stUptime'))$('stUptime').textContent=txt;
-  },1000);
+// ===== PARTICIPANTS =====
+const participants=[['Orchestrator','orchestrator','LIVE','16%','423MB','12'],['Pidgin Runtime','orchestrator','LIVE','22%','526MB','18'],['Safety Gate','safety','LIVE','27%','382MB','6'],['DeepResearch','researcher','LIVE','31%','872MB','23'],['Executor A','executor','LIVE','34%','362MB','41'],['Executor B','executor','LIVE','29%','515MB','37'],['Memory Archivist','memory','LIVE','18%','611MB','9'],['Human Approval','approver','AWAITING','12%','234MB','2'],['Outpost','remote','LIVE','16%','312MB','14'],['Redis','memory','LIVE','17%','512MB','26'],['Logger','observer','LIVE','13%','498MB','16'],['Alert Manager','observer','OFFLINE','0%','0MB','0']];
+document.getElementById('participants').innerHTML=participants.map(p=>'<tr><td>\u25C9 '+p[0]+'</td><td><span class="role">'+p[1]+'</span></td><td><span class="'+(p[2]==='LIVE'?'live-tag':p[2]==='OFFLINE'?'off-tag':'wait-tag')+'">'+p[2]+'</span></td><td>'+(p[2]==='OFFLINE'?'&#x25CB;':'<i class="status-dot"></i>')+'</td><td style="color:var(--green)">'+p[3]+'</td><td style="color:var(--cyan)">'+p[4]+'</td><td>'+p[5]+'</td></tr>').join('');
 
-  // ===== COMMUNICATIONS GRAPH =====
-  var G_NODES=[
-    {id:'orch',name:'Orchestrator',ip:'18.0.0.2:9000',type:'orch',up:'7.24k',down:'7.91k',x:0.48,y:0.08},
-    {id:'rt',name:'Pidgin Runtime',ip:'18.0.0.2:8201',type:'runtime',up:'1.32k',down:'1.04k',x:0.12,y:0.28},
-    {id:'sg',name:'Safety Gate',ip:'18.0.0.2:7801',type:'safety',up:'2.91k',down:'3.12k',x:0.38,y:0.28},
-    {id:'mem',name:'Memory Archivist',ip:'18.0.0.2:8300',type:'mem',up:'0.81k',down:'0.81k',x:0.62,y:0.08},
-    {id:'dr',name:'DeepResearch',ip:'18.0.0.2:7100',type:'exec',up:'1.04k',down:'1.19k',x:0.15,y:0.48},
-    {id:'ea',name:'Executor A',ip:'18.0.0.2:7200',type:'exec',up:'2.74k',down:'2.81k',x:0.42,y:0.48},
-    {id:'eb',name:'Executor B',ip:'18.0.0.2:7201',type:'exec',up:'0.92k',down:'0.95k',x:0.65,y:0.48},
-    {id:'ha',name:'Human Approval',ip:'18.0.0.2:9002',type:'human',up:'1.32k',down:'1.97k',x:0.42,y:0.68},
-    {id:'out',name:'Outpost',ip:'18.0.0.0:6301',type:'infra',up:'0.81k',down:'0.55k',x:0.12,y:0.68},
-    {id:'redis',name:'Redis',ip:'18.0.0.10:6379',type:'infra',up:'3.18k',down:'3.91k',x:0.32,y:0.85},
-    {id:'log',name:'Logger',ip:'18.0.0.15:12000',type:'infra',up:'5.10k',down:'9.50k',x:0.62,y:0.85}
-  ];
-  var G_LINKS=[
-    {from:'orch',to:'sg',speed:3},{from:'orch',to:'rt',speed:3},{from:'orch',to:'mem',speed:2},
-    {from:'sg',to:'ea',speed:2},{from:'sg',to:'dr',speed:2},{from:'sg',to:'eb',speed:1},
-    {from:'rt',to:'dr',speed:2},{from:'rt',to:'ea',speed:3},
-    {from:'ea',to:'ha',speed:2},{from:'eb',to:'ha',speed:2},
-    {from:'ha',to:'orch',speed:3},{from:'mem',to:'redis',speed:2},
-    {from:'orch',to:'log',speed:2},{from:'out',to:'redis',speed:1},{from:'out',to:'orch',speed:1},
-    {from:'ea',to:'eb',speed:1},{from:'dr',to:'mem',speed:1}
-  ];
-  var linkColors=['','var(--green)','var(--yellow)','var(--red)','var(--muted)'];
+// ===== CHAT =====
+const messages=[['14:45:01','Orchestrator','@run generic_review','orch'],['14:45:03','Pidgin Runtime','research.collect started',''],['14:45:05','Safety Gate','SG-2 flagged: untrusted_domain','safety'],['14:45:07','DeepResearch','validated',''],['14:45:09','Executor A','handoff accepted',''],['14:45:11','Safety Gate','human approval required','safety'],['14:45:13','Human Approval','human approval granted','human'],['14:45:15','Executor A','proceeding with execution',''],['14:45:17','Memory Archivist','archive snapshot queued',''],['14:45:19','Orchestrator','handoff complete','orch']];
+function renderChat(){document.getElementById('chatList').innerHTML=messages.map(m=>'<div class="msg '+m[3]+'"><div class="msg-top"><time>'+m[0]+'</time><b>'+m[1]+'</b><span style="color:var(--cyan)">\u2713</span></div><p>'+m[2]+'</p></div>').join('')}
+renderChat();
+function sendChat(){const i=document.getElementById('chatInput');if(!i.value.trim())return;messages.push([new Date().toLocaleTimeString('en-GB',{hour12:false}),'Operator',i.value.trim(),'human']);if(messages.length>10)messages.shift();renderChat();i.value=''}
+document.getElementById('chatInput').addEventListener('keydown',e=>{if(e.key==='Enter')sendChat()});
+setInterval(()=>{messages.push(messages.shift());renderChat()},6500);
 
-  function drawGraph(){
-    var c=$('graphCanvas');if(!c)return;
-    var ctx=c.getContext('2d');
-    var rect=c.parentElement.getBoundingClientRect();
-    c.width=rect.width*2;c.height=rect.height*2;
-    ctx.scale(2,2);
-    ctx.clearRect(0,0,rect.width,rect.height);
-    var W=rect.width,H=rect.height;
+// ===== LOGS =====
+const logs=[['INF','Orchestrator','wf=generic_review node=Start trigger=rpc_hash from=18.0.0.2:9000 msg=parsed'],['DBG','Pidgin Runtime','module=collector action=spawn target=research.collect latency=8ms'],['INF','Validator','wf=generic_review schema=v1.2 valid=true latency=9ms'],['WRN','Safety Gate','SG-2 BLOCKED rule=SG-2 reason=untrusted_domain risk=med latency=12ms'],['INF','DeepResearch','routing to human_approval reason=safety_block latency=11ms'],['INF','Human Approval','decision=approve by=operator_7 latency=9ms'],['INF','Safety Gate','re-evaluated rule=SG-2 pass=true latency=7ms'],['INF','Executor A','execution start node=DeepResearch.collect args=generic_review latency=21ms'],['INF','Memory Archivist','snapshot queued wf=generic_review latency=10ms'],['INF','Executor A','execution done node=generic.collect status=success latency=248ms'],['INF','Logger','handoff completed wf=generic_review latency=6ms'],['INF','Orchestrator','workflow complete wf=generic_review status=success latency=228ms'],['DBG','Telemetry','metrics flushed pts=1,842 blocked=1 errors=0 latency=8ms']];
+document.getElementById('logView').innerHTML=logs.map((l,i)=>'<div class="logline"><span class="ts">14:45:'+String(i+1).padStart(2,'0')+'.'+Math.floor(Math.random()*900+100)+'</span> <span class="'+l[0].toLowerCase()+'">'+l[0]+'</span> <span style="color:'+(l[0]==='WRN'?'var(--red)':'var(--green)')+'">['+l[1]+']</span> '+l[2]+'</div>').join('');
 
-    // draw links
-    for(var i=0;i<G_LINKS.length;i++){
-      var l=G_LINKS[i];
-      var fromN=G_NODES.find(function(n){return n.id===l.from});
-      var toN=G_NODES.find(function(n){return n.id===l.to});
-      if(!fromN||!toN)continue;
-      var x1=fromN.x*W,y1=fromN.y*H,x2=toN.x*W,y2=toN.y*H;
-      ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);
-      ctx.strokeStyle=linkColors[l.speed]||'var(--muted)';ctx.lineWidth=1;ctx.globalAlpha=0.6;ctx.stroke();ctx.globalAlpha=1;
-      // arrow
-      var angle=Math.atan2(y2-y1,x2-x1);
-      var mx=(x1+x2)/2,my=(y1+y2)/2;
-      ctx.beginPath();ctx.moveTo(mx+5*Math.cos(angle),my+5*Math.sin(angle));
-      ctx.lineTo(mx+5*Math.cos(angle+2.5),my+5*Math.sin(angle+2.5));
-      ctx.lineTo(mx+5*Math.cos(angle-2.5),my+5*Math.sin(angle-2.5));ctx.closePath();
-      ctx.fillStyle=linkColors[l.speed]||'var(--muted)';ctx.globalAlpha=0.7;ctx.fill();ctx.globalAlpha=1;
-    }
+// ===== THROUGHPUT CHART =====
+const canvas=document.getElementById('throughput'),ctx=canvas.getContext('2d');let incoming=Array.from({length:80},(_,i)=>.42+Math.random()*.24+i*.001),outgoing=Array.from({length:80},(_,i)=>.25+Math.random()*.22+i*.001);
+function drawChart(){const r=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;canvas.width=Math.max(10,r.width*dpr);canvas.height=Math.max(10,r.height*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);const w=r.width,h=r.height;ctx.clearRect(0,0,w,h);ctx.strokeStyle='#1b2528';ctx.lineWidth=1;for(let y=12;y<h;y+=22){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}[[C.green,outgoing],[C.cyan,incoming]].forEach(([color,data])=>{ctx.strokeStyle=color;ctx.beginPath();data.forEach((v,i)=>{const x=i*(w/(data.length-1)),y=h-v*h;i?ctx.lineTo(x,y):x.moveTo(x,y)});ctx.stroke()})}
+drawChart();
 
-    // draw nodes
-    for(var i=0;i<G_NODES.length;i++){
-      var n=G_NODES[i];
-      var x=n.x*W,y=n.y*H;
-      var bw=100,bh=40;
-      ctx.fillStyle='var(--panel)';ctx.strokeStyle='rgba(12,18,24,0.8)';ctx.lineWidth=1;
-      ctx.fillRect(x-bw/2,y-bh/2,bw,bh);ctx.strokeRect(x-bw/2,y-bh/2,bw,bh);
-      ctx.fillStyle='var(--ink)';ctx.font='bold 9px monospace';ctx.textAlign='center';ctx.fillText(n.name,x,y-8);
-      ctx.fillStyle='var(--muted)';ctx.font='7px monospace';ctx.fillText(n.ip,x,y+4);
-      ctx.fillStyle='var(--green)';ctx.font='7px monospace';ctx.textAlign='left';
-      ctx.fillText('\u2191 '+n.up,x-bw/2+4,y+15);
-      ctx.fillStyle='var(--cyan)';ctx.fillText('\u2193 '+n.down,x+bw/2-26,y+15);
-    }
-  }
-  drawGraph();
-  window.addEventListener('resize',drawGraph);
-  setInterval(drawGraph,3000);
-
-  // ===== HANDOFF PIPELINE =====
-  var PIPE=[
-    {name:'PARSE',status:'ok',count:1842,lat:'7ms'},
-    {name:'VALIDATE',status:'ok',count:1832,lat:'8ms'},
-    {name:'SAFETY',status:'blocked',count:1821,lat:'12ms'},
-    {name:'RESOLVE',status:'ok',count:1783,lat:'9ms'},
-    {name:'EXPAND',status:'ok',count:1752,lat:'15ms'},
-    {name:'EXECUTE',status:'ok',count:1681,lat:'23ms'},
-    {name:'LOG',status:'ok',count:1842,lat:'7ms'}
-  ];
-  function renderPipe(){
-    var el=$('pipeList');if(!el)return;el.innerHTML='';
-    for(var i=0;i<PIPE.length;i++){
-      var p=PIPE[i];
-      var d=document.createElement('div');d.className='pipe-row';
-      var statusLabel=p.status==='blocked'?'SG-2 BLOCKED':(p.status==='ok'?'OK':'FAIL');
-      var statusClass=p.status==='blocked'?'blocked':p.status;
-      // sparkline bars
-      var sparkHtml='';
-      for(var j=0;j<20;j++){
-        var h=4+Math.random()*12;
-        var color=p.status==='blocked'&&j>14?'var(--yellow)':'var(--green)';
-        sparkHtml+='<div style="display:inline-block;width:2px;height:'+h+'px;background:'+color+';margin-right:1px;opacity:'+(0.3+j*0.035)+'"></div>';
-      }
-      d.innerHTML='<span class="pr-num">'+(i+1)+'</span><span class="pr-name">'+p.name+'</span><span class="pr-dot '+p.status+'"></span><span class="pr-status '+statusClass+'">'+statusLabel+'</span><span class="pr-count">'+p.count.toLocaleString()+'</span><span class="pr-lat">'+p.lat+'</span><span class="pr-spark" style="display:flex;align-items:end">'+sparkHtml+'</span>';
-      el.appendChild(d);
-    }
-  }
-  renderPipe();
-
-  // ===== PARTICIPANTS =====
-  var PARTS=[
-    {name:'Orchestrator',role:'orchestrator',status:'LIVE',hb:'16',cpu:'423MB',mem:'12',q:'',color:'var(--orange)'},
-    {name:'Pidgin Runtime',role:'orchestrator',status:'LIVE',hb:'22',cpu:'526MB',mem:'18',q:'',color:'var(--cyan)'},
-    {name:'Safety Gate',role:'safety',status:'LIVE',hb:'27',cpu:'382MB',mem:'6',q:'',color:'var(--red)'},
-    {name:'DeepResearch',role:'researcher',status:'LIVE',hb:'31',cpu:'872MB',mem:'23',q:'',color:'var(--green)'},
-    {name:'Executor A',role:'executor',status:'LIVE',hb:'34',cpu:'362MB',mem:'41',q:'',color:'var(--green)'},
-    {name:'Executor B',role:'executor',status:'LIVE',hb:'29',cpu:'515MB',mem:'37',q:'',color:'var(--green)'},
-    {name:'Memory Archivist',role:'memory',status:'LIVE',hb:'18',cpu:'611MB',mem:'9',q:'',color:'var(--purple)'},
-    {name:'Human Approval',role:'approver',status:'AWAITING',hb:'12',cpu:'234MB',mem:'2',q:'',color:'var(--yellow)'},
-    {name:'Outpost',role:'remote',status:'LIVE',hb:'16',cpu:'312MB',mem:'14',q:'',color:'var(--muted)'},
-    {name:'Redis',role:'memory',status:'LIVE',hb:'17',cpu:'512MB',mem:'26',q:'',color:'var(--red)'},
-    {name:'Logger',role:'observer',status:'LIVE',hb:'13',cpu:'498MB',mem:'16',q:'',color:'var(--muted)'},
-    {name:'Alert Manager',role:'observer',status:'OFFLINE',hb:'0%',cpu:'0MB',mem:'0',q:'',color:'var(--red)'}
-  ];
-  function renderParts(){
-    var el=$('partList');if(!el)return;el.innerHTML='';
-    for(var i=0;i<PARTS.length;i++){
-      var p=PARTS[i];
-      var statusClass=p.status==='LIVE'?'live':p.status==='AWAITING'?'awaiting':'offline';
-      var d=document.createElement('div');d.className='part-row';
-      d.innerHTML='<span class="pa-agent"><span class="pa-dot" style="background:'+p.color+'"></span>'+p.name+'</span><span class="pa-role">'+p.role+'</span><span class="pa-status '+statusClass+'">'+p.status+'</span><span class="pa-hb">'+p.hb+'</span><span class="pa-cpu">'+p.cpu+'</span><span class="pa-mem">'+p.mem+'</span><span class="pa-q">'+p.q+'</span>';
-      el.appendChild(d);
-    }
-  }
-  renderParts();
-
-  // ===== AGENT CHAT =====
-  var CHAT_INIT=[
-    {time:'14:45:01',agent:'Orchestrator',cls:'orch',text:'@run generic_review'},
-    {time:'14:45:03',agent:'Pidgin Runtime',cls:'runtime',text:'research.collect started'},
-    {time:'14:45:05',agent:'Safety Gate',cls:'safety',text:'SG-2 flagged: untrusted_domain'},
-    {time:'14:45:07',agent:'DeepResearch',cls:'exec',text:'validated'},
-    {time:'14:45:09',agent:'Executor A',cls:'exec',text:'handoff accepted'},
-    {time:'14:45:11',agent:'Safety Gate',cls:'safety',text:'human approval required'},
-    {time:'14:45:13',agent:'Human Approval',cls:'human',text:'human approval granted'},
-    {time:'14:45:15',agent:'Executor A',cls:'exec',text:'proceeding with execution'},
-    {time:'14:45:17',agent:'Memory Archivist',cls:'arch',text:'archive snapshot queued'},
-    {time:'14:45:19',agent:'Orchestrator',cls:'orch',text:'handoff complete'}
-  ];
-  function renderChat(){
-    var el=$('chatMsgs');if(!el)return;el.innerHTML='';
-    for(var i=0;i<CHAT_INIT.length;i++){
-      var c=CHAT_INIT[i];
-      var d=document.createElement('div');d.className='chat-msg';
-      d.innerHTML='<span class="cm-time">'+c.time+'</span><div class="cm-body"><div class="cm-agent '+c.cls+'">'+c.agent+'</div><div class="cm-text">'+c.text+'</div></div>';
-      el.appendChild(d);
-    }
-  }
-  renderChat();
-  $('chatSend').onclick=function(){
-    var v=$('chatIn').value.trim();if(!v)return;
-    var n=new Date();var ts=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0');
-    CHAT_INIT.push({time:ts,agent:'User',cls:'human',text:v});
-    renderChat();$('chatIn').value='';
-    $('chatMsgs').scrollTop=$('chatMsgs').scrollHeight;
-  };
-  $('chatIn').onkeydown=function(e){if(e.key==='Enter')$('chatSend').click()};
-
-  // ===== LIVE LOGS =====
-  var LOGS=[
-    {time:'14:45:01.123',lvl:'inf',src:'[Orchestrator]',msg:'wf=generic_review node=Start trigger=rpc_hash from=18.0.0.2:9000 msg=parsed'},
-    {time:'14:45:01.456',lvl:'dbg',src:'[Pidgin Runtime]',msg:'module=collector action=spawn target=research.collect latency=8ms'},
-    {time:'14:45:01.789',lvl:'inf',src:'[Validator]',msg:'wf=generic_review schema=v1.2 valid=true latency=6ms'},
-    {time:'14:45:02.015',lvl:'wrn',src:'[Safety Gate]',msg:'SG-2 BLOCKED rule=SG-2 reason=untrusted_domain risk=med latency=12ms'},
-    {time:'14:45:02.336',lvl:'inf',src:'[DeepResearch]',msg:'routing to human_approval reason=safety_block latency=11ms'},
-    {time:'14:45:02.789',lvl:'inf',src:'[Human Approval]',msg:'decision=approve by=operator_7 latency=9ms'},
-    {time:'14:45:03.162',lvl:'inf',src:'[Safety Gate]',msg:'re-evaluated rule=SG-2 pass=true latency=7ms'},
-    {time:'14:45:03.451',lvl:'inf',src:'[Executor A]',msg:'execution start node=DeepResearch.collect args=generic_review latency=21ms'},
-    {time:'14:45:05.083',lvl:'inf',src:'[Memory Archivist]',msg:'snapshot queued wf=review latency=10ms'},
-    {time:'14:45:07.412',lvl:'inf',src:'[Executor A]',msg:'execution done node=generic.collect status=success latency=248ms'},
-    {time:'14:45:07.913',lvl:'inf',src:'[Logger]',msg:'handoff completed wf=generic_review latency=6ms'},
-    {time:'14:45:08.234',lvl:'inf',src:'[Orchestrator]',msg:'workflow complete wf=generic_review status=success latency=228ms'},
-    {time:'14:45:08.560',lvl:'dbg',src:'[Telemetry]',msg:'metrics flushed pkts=1,842 blocked=1 errors=0 latency=8ms'}
-  ];
-  function renderLogs(){
-    var el=$('logList');if(!el)return;el.innerHTML='';
-    for(var i=0;i<LOGS.length;i++){
-      var l=LOGS[i];
-      var d=document.createElement('div');d.className='log-entry';
-      var msgHtml=l.msg.replace(/(\w+=[^\s,]+)/g,'<span class="hl">$1</span>');
-      d.innerHTML='<span class="le-time">'+l.time+'</span><span class="le-lvl '+l.lvl+'">'+l.lvl.toUpperCase()+'</span><span class="le-src">'+l.src+'</span><span class="le-msg">'+msgHtml+'</span>';
-      el.appendChild(d);
-    }
-  }
-  renderLogs();
-
-  // ===== RISK EVENTS =====
-  var RISKS=[
-    {time:'14:45:02',rule:'SG-2',sev:'MED',agent:'Safety Gate',detail:'untrusted_domain'},
-    {time:'14:44:58',rule:'SG-5',sev:'HIGH',agent:'Safety Gate',detail:'pkt_injected'},
-    {time:'14:43:56',rule:'SG-1',sev:'LOW',agent:'Validator',detail:'malformed_input'},
-    {time:'14:43:41',rule:'SG-3',sev:'MED',agent:'Safety Gate',detail:'tool_mismatch'},
-    {time:'14:43:12',rule:'SG-4',sev:'HIGH',agent:'Executor A',detail:'prompt_injection'}
-  ];
-  function renderRisks(){
-    var el=$('riskList');if(!el)return;el.innerHTML='';
-    for(var i=0;i<RISKS.length;i++){
-      var r=RISKS[i];
-      var d=document.createElement('div');d.className='risk-row';
-      d.innerHTML='<span class="rr-time">'+r.time+'</span><span class="rr-rule">'+r.rule+'</span><span class="rr-sev '+r.sev.toLowerCase()+'">'+r.sev+'</span><span class="rr-agent">'+r.agent+'</span><span class="rr-det">'+r.detail+'</span>';
-      el.appendChild(d);
-    }
-  }
-  renderRisks();
-
-  // ===== TELEMETRY CHART =====
-  function drawTeleChart(){
-    var c=$('teleChart');if(!c)return;
-    var ctx=c.getContext('2d');
-    var rect=c.parentElement.getBoundingClientRect();
-    c.width=rect.width*2;c.height=rect.height*2;
-    ctx.scale(2,2);
-    ctx.clearRect(0,0,rect.width,rect.height);
-    var W=rect.width,H=rect.height;
-    var pts=60;
-    // incoming
-    ctx.beginPath();ctx.strokeStyle='var(--cyan)';ctx.lineWidth=1;
-    for(var i=0;i<pts;i++){
-      var x=i*(W/pts),y=H*0.3+Math.sin(i*0.3)*H*0.15+Math.random()*H*0.05;
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-    // outgoing
-    ctx.beginPath();ctx.strokeStyle='var(--green)';ctx.lineWidth=1;
-    for(var i=0;i<pts;i++){
-      var x=i*(W/pts),y=H*0.5+Math.cos(i*0.25)*H*0.12+Math.random()*H*0.04;
-      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
-    }
-    ctx.stroke();
-    // axis labels
-    ctx.fillStyle='var(--muted)';ctx.font='7px monospace';ctx.textAlign='center';
-    var times=['14:40','14:45','14:50','14:55','15:00','15:05'];
-    for(var i=0;i<times.length;i++){
-      ctx.fillText(times[i],i*(W/(times.length-1)),H-2);
-    }
-  }
-  drawTeleChart();
-  setInterval(drawTeleChart,4000);
-
-  // ===== ESCAPE TO CLOSE =====
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape'&&$('docsView').className.indexOf('show')>=0){
-      $('dashView').className='show';$('docsView').className='';
-      for(var j=0;j<navItems.length;j++)navItems[j].classList.remove('on');
-    }
+// ===== PANEL CLICK HIGHLIGHT =====
+document.querySelectorAll('#dashView .panel').forEach(panel=>{
+  panel.addEventListener('pointerdown',()=>{
+    document.querySelectorAll('#dashView .panel').forEach(p=>p.classList.remove('is-active'));
+    panel.classList.add('is-active');
   });
+});
 
-})();
+// ===== DOCS NAVIGATION =====
+const pageToc={
+  overview:['What is PIDGIN?','Lifecycle','Sample Packet','Install','Commands','Safety Rules','Next Steps'],
+  install:['Prerequisites','Install from crates.io','Initialize a Workspace','Verify Installation','Install from Source','Platform Support'],
+  quickstart:['Step 1: Create a Packet','Step 2: Parse the Packet','Step 3: Validate','Step 4: Run Safety Checks','Step 5: Expand to Execution Plan','Step 6: Run the Workflow','Complete Example'],
+  packet:['Anatomy','Directive','Required Fields','Optional Fields','Handoff Fields','Context Transfer','Field Naming'],
+  commands:['pgn init','pgn parse','pgn validate','pgn check','pgn resolve','pgn expand','pgn run','pgn measure','pgn docs','pgn serve','Global Options'],
+  safety:['SG-1: Schema Validation','SG-2: Signature Verification','SG-3: Workflow Allowlist','SG-4: Mode Constraints','SG-5: Denylist Enforcement','SG-6: Risk Thresholds','SG-7: Human Control','SG-8: Output Constraints','SG-9: Audit Logging','Rule Evaluation Order','Custom Rules'],
+  multiagent:['Agent Configuration','Handoff Modes','Chain Depth','Trust Relationships'],
+  langgraph:['Setup','Usage','Configuration'],
+  crewai:['Setup','Usage','How It Works'],
+  a2a:['Protocol','Endpoint','Discovery'],
+  hostconfig:['Full Config Reference','Environment Variables'],
+  rustlib:['Add Dependency','Basic Usage','API Reference'],
+  build:['Requirements','Clone and Build','Project Structure','Install Locally'],
+  api:['Base URL','Endpoints','POST /api/v1/parse','Response Format','POST /api/v1/check','Error Responses']
+};
+
+function navTo(page){
+  document.querySelectorAll('#docMenu a').forEach(a=>{a.classList.remove('active');if(a.dataset.page===page)a.classList.add('active')});
+  document.querySelectorAll('.doc-content-section').forEach(s=>s.classList.remove('active'));
+  const el=document.getElementById('page-'+page);if(el)el.classList.add('active');
+  const toc=pageToc[page]||pageToc.overview;
+  document.getElementById('tocList').innerHTML=toc.map((t,i)=>'<a'+(i===0?' class="active"':'')+'>'+t+'</a>').join('');
+  document.getElementById('docsMain').scrollTop=0;
+  // wire toc clicks
+  document.querySelectorAll('#tocList a').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('#tocList a').forEach(x=>x.classList.remove('active'));a.classList.add('active')}));
+}
+
+document.querySelectorAll('#docMenu a').forEach(a=>a.addEventListener('click',()=>{navTo(a.dataset.page)}));
+document.querySelectorAll('.menu a').forEach(a=>a.addEventListener('click',()=>{document.querySelectorAll('.menu a').forEach(x=>x.classList.remove('active'));a.classList.add('active')}));
 </script>
 </body>
 </html>
