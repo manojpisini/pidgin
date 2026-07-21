@@ -12,51 +12,51 @@
   --ink:#c8ccd0;--dim:#6a727a;--muted:#3a424a;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono','Courier New',monospace;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden}
+html,body{height:100%;overflow:hidden}
 
-#app{display:grid;grid-template-columns:200px 1fr 1fr;grid-template-rows:38px 1fr 120px 1fr;height:100vh;gap:1px;background:var(--border);padding:3px}
-#app>*{background:var(--panel)}
+#app{position:fixed;top:3px;left:3px;right:3px;bottom:3px;display:grid;grid-template-columns:200px 1fr 1fr;grid-template-rows:38px 300px 120px 1fr;gap:1px;background:var(--border)}
+#app>*{background:var(--panel);overflow:hidden;min-height:0;min-width:0}
 
-#docsView{display:none;grid-template-columns:200px 1fr;grid-template-rows:38px 1fr;height:100vh;gap:1px;background:var(--border);padding:3px}
-#docsView>*{background:var(--panel)}
+#docsView{position:fixed;top:3px;left:3px;right:3px;bottom:3px;display:none;grid-template-columns:200px 1fr;grid-template-rows:38px 1fr;gap:1px;background:var(--border)}
+#docsView>*{background:var(--panel);overflow:hidden;min-height:0;min-width:0}
 #docsView.show{display:grid}
 #app.hide{display:none}
 
-.hdr{grid-column:1/-1;display:flex;align-items:center;padding:0 14px;gap:10px}
-.hdr .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+.hdr{grid-column:1/-1;display:flex;align-items:center;padding:0 14px;gap:10px;overflow:hidden}
+.hdr .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;flex-shrink:0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
-.hdr .brand{font-size:13px;color:var(--green);letter-spacing:3px;font-weight:700}
-.hdr .ver{font-size:10px;color:var(--muted)}
-.hdr .sep{color:var(--muted);margin:0 2px}
-.hdr .stat{font-size:11px;color:var(--dim)}
+.hdr .brand{font-size:13px;color:var(--green);letter-spacing:3px;font-weight:700;flex-shrink:0}
+.hdr .ver{font-size:10px;color:var(--muted);flex-shrink:0}
+.hdr .sep{color:var(--muted);margin:0 2px;flex-shrink:0}
+.hdr .stat{font-size:11px;color:var(--dim);flex-shrink:0}
 .hdr .stat b{color:var(--ink);font-weight:400}
-.hdr .right{margin-left:auto;display:flex;align-items:center;gap:12px}
-.hdr .live{font-size:10px;color:var(--green);letter-spacing:1px}
-.hdr .btn{font-size:10px;color:var(--dim);border:1px solid var(--border);padding:3px 10px;cursor:pointer;background:transparent;font-family:inherit;letter-spacing:1px}
+.hdr .right{margin-left:auto;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.hdr .live{font-size:10px;color:var(--green);letter-spacing:1px;flex-shrink:0}
+.hdr .btn{font-size:10px;color:var(--dim);border:1px solid var(--border);padding:3px 10px;cursor:pointer;background:transparent;font-family:inherit;letter-spacing:1px;flex-shrink:0}
 .hdr .btn:hover{border-color:var(--accent);color:var(--accent)}
 
-.ph{font-size:9px;color:var(--muted);letter-spacing:2px;padding:8px 12px 5px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.ph{font-size:9px;color:var(--muted);letter-spacing:2px;padding:8px 12px 5px;text-transform:uppercase;border-bottom:1px solid var(--border);flex-shrink:0;overflow:hidden}
 .ph::before{content:' ';display:inline-block;width:5px;height:5px;margin-right:6px;border-radius:1px;vertical-align:middle}
 .ph.pg::before{background:var(--green)}.ph.pp::before{background:var(--purple)}
 .ph.pe::before{background:var(--red)}.ph.po::before{background:var(--orange)}
 
 .side{grid-column:1;grid-row:2/5;display:flex;flex-direction:column;overflow:hidden}
-.stages{flex:1;overflow-y:auto;padding:4px 0}
+.stages{flex:1;overflow-y:auto;overflow-x:hidden}
 .stg{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:11px;color:var(--dim);border-left:3px solid var(--muted)}
 .stg.run{border-left-color:var(--accent);color:var(--ink);background:rgba(0,255,65,0.03)}
 .stg.pass{border-left-color:var(--green);color:var(--ink)}
 .stg.fail{border-left-color:var(--red);color:var(--red)}
-.stg .nm{width:60px;font-weight:600;letter-spacing:1px}
-.stg .inf{margin-left:auto;font-size:10px}
-.side-bot{border-top:1px solid var(--border);padding:8px 12px}
+.stg .nm{width:60px;font-weight:600;letter-spacing:1px;flex-shrink:0}
+.stg .inf{margin-left:auto;font-size:10px;text-align:right}
+.side-bot{border-top:1px solid var(--border);padding:8px 12px;flex-shrink:0;overflow:hidden}
 .sr{display:flex;justify-content:space-between;font-size:10px;padding:2px 0}
 .sr .k{color:var(--muted)}.sr .v{color:var(--ink)}.sr .g{color:var(--green)}.sr .r{color:var(--red)}
 
 .mid{grid-column:2/4;grid-row:2;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
-.mid>*{background:var(--panel);display:flex;flex-direction:column;overflow:hidden}
-.scroll{flex:1;overflow-y:auto;padding:6px 12px}
+.mid>*{background:var(--panel);display:flex;flex-direction:column;overflow:hidden;min-height:0}
+.scroll{flex:1;overflow-y:auto;overflow-x:hidden;min-height:0}
 
-.msg{display:flex;gap:8px;padding:4px 0;font-size:11px;line-height:1.5;border-bottom:1px solid rgba(17,21,24,0.3)}
+.msg{display:flex;gap:8px;padding:4px 12px;font-size:11px;line-height:1.5;border-bottom:1px solid rgba(17,21,24,0.3)}
 .msg .ts{color:var(--muted);font-size:9px;flex-shrink:0;width:60px}
 .msg .tag{font-size:9px;font-weight:700;letter-spacing:1px;flex-shrink:0;padding:2px 5px;border:1px solid var(--border);text-transform:uppercase}
 .msg .tag.sys{color:var(--green);border-color:#0f2015}
@@ -65,23 +65,23 @@ body{font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono','Courier
 .msg .tag.err{color:var(--red);border-color:#200f10}
 .msg .tag.net{color:var(--blue);border-color:#0f1520}
 .msg .tag.orch{color:var(--orange);border-color:#201a0f}
-.msg .b{color:var(--dim);word-break:break-all;flex:1}
+.msg .b{color:var(--dim);word-break:break-all;flex:1;min-width:0}
 .msg .g{color:var(--green)}.msg .r{color:var(--red)}.msg .y{color:var(--yellow)}
 .msg .c{color:var(--cyan)}.msg .p{color:var(--purple)}.msg .w{color:var(--ink)}.msg .o{color:var(--orange)}
 .msg .hex{color:var(--muted);opacity:.5;font-size:9px}
-.msg .sep-line{color:var(--muted);font-size:10px;letter-spacing:3px;opacity:.4;padding:3px 0}
+.msg .sep-line{color:var(--muted);font-size:10px;letter-spacing:3px;opacity:.4;padding:3px 12px}
 
-.elog{display:flex;gap:6px;padding:3px 0;font-size:10px;line-height:1.4;border-bottom:1px solid rgba(17,21,24,0.3)}
+.elog{display:flex;gap:6px;padding:3px 12px;font-size:10px;line-height:1.4;border-bottom:1px solid rgba(17,21,24,0.3)}
 .elog .et{color:var(--muted);flex-shrink:0;width:54px}
 .elog .lv{flex-shrink:0;width:34px;font-weight:700;font-size:9px;letter-spacing:1px;text-transform:uppercase}
 .elog .lv.info{color:var(--cyan)}.elog .lv.ok{color:var(--green)}.elog .lv.warn{color:var(--yellow)}
 .elog .lv.err{color:var(--red)}.elog .lv.debug{color:var(--muted)}.elog .lv.trace{color:var(--dim)}
 .elog .es{flex-shrink:0;width:50px;color:var(--muted);font-size:9px}
-.elog .em{color:var(--dim);word-break:break-all;flex:1}
+.elog .em{color:var(--dim);word-break:break-all;flex:1;min-width:0}
 
-.agents{grid-column:2/4;grid-row:3;overflow:hidden}
-.agents .a-scroll{display:flex;gap:8px;padding:6px 12px;overflow-x:auto;overflow-y:hidden}
-.ac{min-width:170px;border:1px solid var(--border);padding:8px 10px;font-size:10px;flex-shrink:0}
+.agents{grid-column:2/4;grid-row:3;overflow:hidden;display:flex;flex-direction:column}
+.agents .a-scroll{flex:1;overflow-y:auto;overflow-x:auto;min-height:0;padding:6px 12px;display:flex;gap:8px}
+.ac{min-width:170px;border:1px solid var(--border);padding:8px 10px;font-size:10px;flex-shrink:0;overflow:hidden}
 .ac.on{border-color:var(--accent);box-shadow:0 0 8px rgba(0,255,65,0.1)}
 .ac .an{color:var(--ink);font-weight:700;font-size:12px;letter-spacing:1px;margin-bottom:4px;display:flex;align-items:center;gap:6px}
 .ac .an .d{width:5px;height:5px;border-radius:50%;flex-shrink:0}
@@ -91,29 +91,29 @@ body{font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono','Courier
 .ac .av.g{color:var(--green)}.ac .av.r{color:var(--red)}.ac .av.y{color:var(--yellow)}.ac .av.o{color:var(--orange)}
 
 .bot{grid-column:2/4;grid-row:4;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
-.bot>*{background:var(--panel)}
+.bot>*{background:var(--panel);overflow:hidden;min-height:0;min-width:0}
 .inp{display:flex;flex-direction:column;padding:10px 14px;gap:6px;overflow:hidden}
-.inp .lb{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
-.inp textarea{flex:1;width:100%;background:var(--bg);border:1px solid var(--border);color:var(--green);font-family:inherit;font-size:11px;padding:8px;resize:none;outline:none;line-height:1.5}
+.inp .lb{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;flex-shrink:0}
+.inp textarea{flex:1;width:100%;background:var(--bg);border:1px solid var(--border);color:var(--green);font-family:inherit;font-size:11px;padding:8px;resize:none;outline:none;line-height:1.5;min-height:0}
 .inp textarea:focus{border-color:var(--accent)}
-.inp .row{display:flex;gap:5px;flex-wrap:wrap}
-.inp button{padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:inherit;font-size:10px;letter-spacing:1px;cursor:pointer}
+.inp .row{display:flex;gap:5px;flex-wrap:wrap;flex-shrink:0}
+.inp button{padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:inherit;font-size:10px;letter-spacing:1px;cursor:pointer;flex-shrink:0}
 .inp button:hover{border-color:var(--ink);color:var(--ink)}
 .inp button.go{border-color:var(--accent);color:var(--accent)}
 .inp button.go:hover{background:var(--accent);color:var(--bg)}
 .insp{display:flex;flex-direction:column;padding:10px 14px;overflow:hidden}
-.insp .lb{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
-.insp-s{display:flex;flex:1;gap:1px;background:var(--border);overflow:hidden}
-.insp-s .h{background:var(--panel);padding:8px;overflow-y:auto;flex:1}
-.insp-s .h .hl{font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
+.insp .lb{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;flex-shrink:0}
+.insp-s{display:flex;flex:1;gap:1px;background:var(--border);overflow:hidden;min-height:0}
+.insp-s .h{background:var(--panel);padding:8px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}
+.insp-s .h .hl{font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px;flex-shrink:0}
 .insp-s pre{font-size:10px;color:var(--dim);line-height:1.5;white-space:pre-wrap;word-break:break-all}
 
-.ds{grid-column:1;grid-row:2;overflow-y:auto;border-right:1px solid var(--border)}
+.ds{grid-column:1;grid-row:2;overflow-y:auto;overflow-x:hidden;border-right:1px solid var(--border)}
 .ds .ni{padding:6px 12px;font-size:11px;color:var(--dim);cursor:pointer;border-left:2px solid transparent}
 .ds .ni:hover{color:var(--ink)}
 .ds .ni.on{color:var(--accent);border-left-color:var(--accent)}
 .ds .ng{font-size:9px;color:var(--muted);letter-spacing:2px;padding:12px 12px 4px;text-transform:uppercase}
-.db{grid-column:2;grid-row:2;overflow-y:auto;padding:20px 28px}
+.db{grid-column:2;grid-row:2;overflow-y:auto;overflow-x:hidden;padding:20px 28px}
 .db h1{color:var(--green);font-size:14px;letter-spacing:2px;font-weight:700;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
 .db h2{color:var(--ink);font-size:12px;font-weight:700;margin:16px 0 6px}
 .db h3{color:var(--cyan);font-size:11px;font-weight:600;margin:12px 0 4px}
@@ -252,7 +252,6 @@ context_id=ctx_abc123</textarea>
     <h1>protocol overview</h1>
     <p>Pidgin is a safety-gated agent-to-agent communication protocol. Every packet travels through a 7-stage pipeline: lex, parse, syntax, schema, safety, resolve, expand.</p>
     <p>The protocol enforces a deny-list model. Agents declare allowed and denied actions. Safety rules block dangerous combinations.</p>
-
     <h1>packet format</h1>
     <pre>@run &lt;run_id&gt;
 wf=&lt;workflow&gt;         mode=draft|approval
@@ -262,31 +261,22 @@ risk=low|med|crit      human=yes|no
 ttl=24                 note="text"</pre>
     <h3>required</h3><ul><li>wf, mode, in, out</li></ul>
     <h3>optional</h3><ul><li>do, deny, risk, human, ttl, note</li></ul>
-
     <h1>handoff fields</h1>
     <pre>from=agent_alpha        to=agent_beta
 chain=[alpha,beta,gamma]
 handoff=forward|relay|delegate
 reply_to=&lt;run_id&gt;      origin=&lt;run_id&gt;</pre>
     <h3>modes</h3><ul><li>forward - pass unchanged</li><li>relay - process and re-wrap</li><li>delegate - full transfer</li></ul>
-
     <h1>context transfer</h1>
     <pre>context_file=[file:path/to/doc.md]
 context_id=ctx_abc123
 context="inline text"
 context_b64=SGVsbG8...</pre>
     <h3>methods</h3>
-    <ul>
-      <li>context_file - file references, resolved at runtime</li>
-      <li>context_id - pointer to uploaded context store</li>
-      <li>context - inline quoted string (small)</li>
-      <li>context_b64 - base64 encoded binary</li>
-    </ul>
+    <ul><li>context_file - file references</li><li>context_id - pointer to store</li><li>context - inline string</li><li>context_b64 - base64 binary</li></ul>
     <h3>limits</h3>
-    <ul><li>inline: max 4KB recommended</li><li>context_file: unlimited</li><li>context_id: unlimited</li><li>context_b64: max 1MB inline</li></ul>
-
+    <ul><li>inline: max 4KB</li><li>context_file: unlimited</li><li>context_id: unlimited</li><li>context_b64: max 1MB</li></ul>
     <h1>directives</h1><ul><li>@run execute workflow</li><li>@result task outcome</li><li>@approval human sign-off</li><li>@context request context</li></ul>
-
     <h1>pipeline</h1>
     <h2>01 LEXER</h2><p>Tokenizes raw text, detects directive.</p>
     <h2>02 PARSER</h2><p>Extracts key-value, parses arrays.</p>
@@ -295,7 +285,6 @@ context_b64=SGVsbG8...</pre>
     <h2>05 SAFETY</h2><p>Evaluates 10 safety rules.</p>
     <h2>06 RESOLVE</h2><p>Resolves reference aliases.</p>
     <h2>07 EXPAND</h2><p>Generates YAML execution spec.</p>
-
     <h1>safety rules</h1>
     <pre>SG-1   deny contains actions from do
 SG-2   critical risk with human=no
@@ -307,12 +296,10 @@ SG-7   missing human on critical
 SG-8   invalid risk level
 SG-9   approval mode without human=yes
 SG-10  chain depth exceeded</pre>
-
     <h1>api</h1>
     <pre>POST /api/v1/parse      POST /api/v1/validate
 POST /api/v1/check      POST /api/v1/expand
 POST /api/v1/run        GET  /api/v1/health</pre>
-
     <h1>cli</h1>
     <pre>pgn init|parse|validate|check|expand|run|serve|docs</pre>
   </div>
@@ -347,7 +334,6 @@ POST /api/v1/run        GET  /api/v1/health</pre>
   function health(){fetch('/api/v1/health').then(function(r){return r.json()}).then(function(d){$('hHost').textContent=d.data.host.split('\\').pop()}).catch(function(){$('hHost').textContent='--'})}
   health();
 
-  // Pipeline
   var STAGES=['LEXER','PARSER','SYNTAX','SCHEMA','SAFETY','RESOLVE','EXPAND'];
   function initStages(){
     var el=$('stages');el.innerHTML='';
@@ -365,7 +351,6 @@ POST /api/v1/run        GET  /api/v1/health</pre>
     e.querySelector('.inf').textContent=inf||st;
   }
 
-  // Agents
   function renderAgents(){
     var el=$('agentList');el.innerHTML='';
     var keys=Object.keys(AGENTS);
@@ -384,7 +369,6 @@ POST /api/v1/run        GET  /api/v1/health</pre>
   }
   renderAgents();
 
-  // Comms
   function cmsg(tag,cls,body){
     var d=document.createElement('div');d.className='msg';
     d.innerHTML='<span class="ts">'+ts()+'</span><span class="tag '+cls+'">'+tag+'</span><span class="b">'+body+'</span>';
@@ -401,7 +385,6 @@ POST /api/v1/run        GET  /api/v1/health</pre>
     $('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight;
   }
 
-  // Elog
   function elog(lvl,src,msg){
     var d=document.createElement('div');d.className='elog';
     d.innerHTML='<span class="et">'+ts()+'</span><span class="lv '+lvl+'">'+lvl+'</span><span class="es">['+src+']</span><span class="em">'+msg+'</span>';
@@ -429,12 +412,9 @@ POST /api/v1/run        GET  /api/v1/health</pre>
   function getField(pgn,name){var m=pgn.match(new RegExp('^'+name+'=(.+)$','m'));return m?m[1]:null}
   function getList(pgn,name){var v=getField(pgn,name);if(!v)return[];var m=v.match(/\[(.*?)\]/);return m?m[1].split(',').map(function(s){return s.trim()}):[]}
 
-  // Main simulation
   function sim(){
-    if(busy)return;
-    busy=true;
-    var pgn=$('pktIn').value;
-    pkts++;upStats();
+    if(busy)return;busy=true;
+    var pgn=$('pktIn').value;pkts++;upStats();
     var t=performance.now();
     var sid=Math.random().toString(16).slice(2,10);
     var fromA=getField(pgn,'from')||'unknown';
@@ -449,23 +429,13 @@ POST /api/v1/run        GET  /api/v1/health</pre>
     if(AGENTS[fromA]){AGENTS[fromA].pkts++;AGENTS[fromA].status='active';AGENTS[fromA].seen=ts().slice(0,8)}
     if(AGENTS[toA]){AGENTS[toA].seen=ts().slice(0,8)}
 
-    cdiv('SESSION '+sid);
-    elogDiv('SESSION '+sid);
-
+    cdiv('SESSION '+sid);elogDiv('SESSION '+sid);
     cmsg('NET','net','<span class="g">0x'+sid+'</span> <span class="o">'+fromA+'</span> <span class="w">&rarr;</span> <span class="c">'+toA+'</span> <span class="y">'+lines+'L/'+pgn.length+'B</span>');
     elog('info','NET','connection 0x'+sid+': '+fromA+' -> '+toA+', '+lines+' lines');
-
-    if(chain.length>1){
-      cmsg('ORCH','orch','chain ['+chain.length+']: '+chain.map(function(c){return '<span class="o">'+c+'</span>'}).join(' <span class="w">&rarr;</span> '));
-      elog('info','ORCH','chain depth='+chain.length+', mode='+hm);
-    }
-
-    if(ctxFl.length){
-      cmsg('AGENT','ag','<span class="g">CTX_FILES</span> '+ctxFl.map(function(f){return '<span class="c">'+f+'</span>'}).join(', '));
-      elog('info','CTX','resolving '+ctxFl.length+' files');
-    }
-    if(ctxId){cmsg('AGENT','ag','<span class="g">CTX_ID</span> <span class="c">'+ctxId+'</span>');elog('info','CTX','fetching store: '+ctxId)}
-    if(ctxIn){cmsg('AGENT','ag','<span class="g">CTX</span> <span class="p">"'+ctxIn.slice(0,50)+'"</span> ('+ctxIn.length+'B)');elog('info','CTX','inline: '+ctxIn.length+' bytes')}
+    if(chain.length>1){cmsg('ORCH','orch','chain ['+chain.length+']: '+chain.map(function(c){return '<span class="o">'+c+'</span>'}).join(' <span class="w">&rarr;</span> '));elog('info','ORCH','chain depth='+chain.length)}
+    if(ctxFl.length){cmsg('AGENT','ag','<span class="g">CTX_FILES</span> '+ctxFl.map(function(f){return '<span class="c">'+f+'</span>'}).join(', '));elog('info','CTX','resolving '+ctxFl.length+' files')}
+    if(ctxId){cmsg('AGENT','ag','<span class="g">CTX_ID</span> <span class="c">'+ctxId+'</span>');elog('info','CTX','fetching: '+ctxId)}
+    if(ctxIn){cmsg('AGENT','ag','<span class="g">CTX</span> <span class="p">"'+ctxIn.slice(0,50)+'"</span> ('+ctxIn.length+'B)');elog('info','CTX','inline: '+ctxIn.length+'B')}
 
     var fa=AGENTS[fromA]||{username:fromA,role:'unknown',type:'unk',model:'?',caps:[]};
     var ta=AGENTS[toA]||{username:toA,role:'unknown',type:'unk',model:'?',caps:[]};
@@ -476,115 +446,67 @@ POST /api/v1/run        GET  /api/v1/health</pre>
     delay(50).then(function(){
       for(var i=0;i<7;i++){setS(i,'run','...');elog('trace','PIPE',STAGES[i]+' starting')}
       return delay(200);
-    }).then(function(){
-      return api('parse',pgn);
-    }).then(function(pr){
-      if(pr.ok){
-        setS(0,'pass','dir='+pr.data.directive);setS(1,'pass','id='+pr.data.run_id.slice(0,10));
-        cmsg('SRV','srv','<span class="g">PARSE_OK</span> directive=<span class="c">'+pr.data.directive+'</span> run_id=<span class="p">'+pr.data.run_id+'</span>');
-        elog('ok','LEXER','tokenized '+lines+' lines');
-        elog('ok','PARSER','directive='+pr.data.directive+', fields='+pr.data.field_count);
-      }else{
-        setS(0,'fail','err');setS(1,'fail','err');
-        cmsg('ERR','err','<span class="r">PARSE_FAIL</span> '+pr.error);elog('err','LEXER',pr.error);
-        blk++;upStats();busy=false;throw 'stop';
-      }
+    }).then(function(){return api('parse',pgn)})
+    .then(function(pr){
+      if(pr.ok){setS(0,'pass','dir='+pr.data.directive);setS(1,'pass','id='+pr.data.run_id.slice(0,10));cmsg('SRV','srv','<span class="g">PARSE_OK</span> directive=<span class="c">'+pr.data.directive+'</span> fields=<span class="y">'+pr.data.field_count+'</span>');elog('ok','LEXER','tokenized '+lines+' lines');elog('ok','PARSER','fields='+pr.data.field_count)}
+      else{setS(0,'fail','err');setS(1,'fail','err');cmsg('ERR','err','<span class="r">PARSE_FAIL</span> '+pr.error);elog('err','LEXER',pr.error);blk++;upStats();busy=false;throw 'stop'}
+      return delay(30);
+    }).then(function(){return api('validate',pgn)})
+    .then(function(vr){
+      if(vr.ok&&vr.data.length===0){setS(2,'pass','ok');cmsg('SRV','srv','<span class="g">VALIDATE_OK</span>');elog('ok','SYNTAX','all fields present')}
+      else{setS(2,'fail',vr.data.length+' err');cmsg('SRV','srv','<span class="r">VALIDATE_FAIL</span>');blk++;upStats();busy=false;throw 'stop'}
       return delay(30);
     }).then(function(){
-      return api('validate',pgn);
-    }).then(function(vr){
-      if(vr.ok&&vr.data.length===0){
-        setS(2,'pass','ok');cmsg('SRV','srv','<span class="g">VALIDATE_OK</span>');elog('ok','SYNTAX','all fields present');
-      }else{
-        setS(2,'fail',vr.data.length+' err');
-        cmsg('SRV','srv','<span class="r">VALIDATE_FAIL</span> '+vr.data.length+' errors');
-        blk++;upStats();busy=false;throw 'stop';
-      }
-      return delay(30);
-    }).then(function(){
-      setS(3,'pass','ok');
-      var wf=getField(pgn,'wf')||'?',rk=getField(pgn,'risk')||'?',hm2=getField(pgn,'human')||'?';
+      setS(3,'pass','ok');var wf=getField(pgn,'wf')||'?',rk=getField(pgn,'risk')||'?',hm2=getField(pgn,'human')||'?';
       cmsg('SRV','srv','<span class="g">SCHEMA_OK</span> wf=<span class="y">'+wf+'</span> risk=<span class="y">'+rk+'</span> human=<span class="c">'+hm2+'</span>');
       elog('ok','SCHEMA','workflow='+wf+', risk='+rk);
       return delay(30);
-    }).then(function(){
-      return api('check',pgn);
-    }).then(function(cr){
+    }).then(function(){return api('check',pgn)})
+    .then(function(cr){
       if(cr.ok){
         var s=cr.data.safety,r=cr.data.resolution;
-        if(s.blocked){
-          setS(4,'fail','BLOCKED');
-          cmsg('SRV','srv','<span class="r">SAFETY_BLOCK</span> '+s.fired_rules.map(function(x){return '<span class="y">'+x+'</span>'}).join(', '));
-          elog('err','SAFETY','BLOCKED: '+s.fired_rules.join(', '));
-          blk++;rules+=s.fired_rules.length;
-        }else{
-          setS(4,'pass',s.fired_rules.length+' rules');
-          cmsg('SRV','srv','<span class="g">SAFETY_PASS</span> '+s.fired_rules.length+' evaluated');
-          elog('ok','SAFETY',s.fired_rules.length+' rules, 0 fired');
-          rules+=s.fired_rules.length;
-        }
-        var ok=r.filter(function(x){return x.status==='RESOLVED'});
-        var bad=r.filter(function(x){return x.status!=='RESOLVED'});
-        res+=ok.length;resF+=bad.length;
-        setS(5,bad.length?'fail':'pass',ok.length+'r/'+bad.length+'u');
-        if(ok.length){cmsg('SRV','srv','<span class="g">RESOLVED</span> '+ok.map(function(x){return '<span class="c">'+x.original+'</span>'}).join(', '))}
-        bad.forEach(function(x){cmsg('SRV','srv','<span class="r">UNRESOLVED</span> <span class="c">'+x.original+'</span>')});
-      }else{
-        setS(4,'fail','err');setS(5,'fail','err');
-        cmsg('ERR','err','<span class="r">CHECK_FAIL</span> '+cr.error);elog('err','SAFETY',cr.error);
-        blk++;upStats();busy=false;throw 'stop';
-      }
+        if(s.blocked){setS(4,'fail','BLOCKED');cmsg('SRV','srv','<span class="r">SAFETY_BLOCK</span> '+s.fired_rules.join(', '));elog('err','SAFETY','BLOCKED: '+s.fired_rules.join(', '));blk++;rules+=s.fired_rules.length}
+        else{setS(4,'pass',s.fired_rules.length+' rules');cmsg('SRV','srv','<span class="g">SAFETY_PASS</span>');elog('ok','SAFETY',s.fired_rules.length+' rules');rules+=s.fired_rules.length}
+        var ok=r.filter(function(x){return x.status==='RESOLVED'}),bad=r.filter(function(x){return x.status!=='RESOLVED'});
+        res+=ok.length;resF+=bad.length;setS(5,bad.length?'fail':'pass',ok.length+'r/'+bad.length+'u');
+        if(ok.length)cmsg('SRV','srv','<span class="g">RESOLVED</span> '+ok.map(function(x){return '<span class="c">'+x.original+'</span>'}).join(', '));
+      }else{setS(4,'fail','err');setS(5,'fail','err');cmsg('ERR','err','<span class="r">CHECK_FAIL</span> '+cr.error);elog('err','SAFETY',cr.error);blk++;upStats();busy=false;throw 'stop'}
       return delay(30);
-    }).then(function(){
-      return api('expand',pgn);
-    }).then(function(er){
+    }).then(function(){return api('expand',pgn)})
+    .then(function(er){
       if(er.ok){
-        setS(6,'pass','done');
-        $('rawP').textContent=pgn;$('expP').textContent=er.data.yaml;
+        setS(6,'pass','done');$('rawP').textContent=pgn;$('expP').textContent=er.data.yaml;
         var exec=er.data.route.match(/executor: (\w+)/);
         cmsg('SRV','srv','<span class="g">EXPAND_OK</span> route=<span class="c">'+(exec?exec[1]:'?')+'</span> yaml=<span class="y">'+er.data.yaml.length+'B</span>');
         cmsg('AGENT','ag','<span class="c">'+ta.username+'</span> ['+ta.role+'] received');
         elog('ok','EXPAND','YAML: '+er.data.yaml.length+' bytes');
-        elog('info','DELIVER',fromA+' -> '+toA+': delivered');
+        elog('info','DELIVER',fromA+' -> '+toA+': done');
         if(AGENTS[toA])AGENTS[toA].status='active';
         passed++;
-      }else{
-        setS(6,'fail','err');
-        cmsg('ERR','err','<span class="r">EXPAND_FAIL</span> '+er.error);elog('err','EXPAND',er.error);
-        blk++;
-      }
-      var lat=(performance.now()-t).toFixed(0);
-      $('sLat').textContent=lat+'ms';
-      elog('info','SYS','complete in '+lat+'ms');
-      cdiv('END '+sid);elogDiv('END '+sid);
+      }else{setS(6,'fail','err');cmsg('ERR','err','<span class="r">EXPAND_FAIL</span> '+er.error);blk++}
+      var lat=(performance.now()-t).toFixed(0);$('sLat').textContent=lat+'ms';
+      elog('info','SYS','complete in '+lat+'ms');cdiv('END '+sid);elogDiv('END '+sid);
       upStats();busy=false;
-    }).catch(function(e){
-      if(e!=='stop')console.error(e);
-    });
+    }).catch(function(e){if(e!=='stop')console.error(e)});
   }
 
   function reset(){
-    busy=false;initStages();
-    $('comms').innerHTML='';$('elog').innerHTML='';
+    busy=false;initStages();$('comms').innerHTML='';$('elog').innerHTML='';
     $('rawP').textContent='--';$('expP').textContent='--';
     pkts=passed=blk=rules=res=resF=0;
     var keys=Object.keys(AGENTS);
     for(var i=0;i<keys.length;i++){var a=AGENTS[keys[i]];a.pkts=0;a.seen=null;if(a.role!=='approver')a.status='idle'}
-    upStats();$('sLat').textContent='--';
-    cmsg('SYS','sys','cleared');elog('info','SYS','session cleared');
+    upStats();$('sLat').textContent='--';cmsg('SYS','sys','cleared');elog('info','SYS','session cleared');
   }
 
   function delay(ms){return new Promise(function(r){setTimeout(r,ms)})}
 
-  // Nav
   $('btnDocs').onclick=function(){$('app').className='hide';$('docsView').className='show'};
   $('btnBack').onclick=function(){$('docsView').className='';$('app').className=''};
   $('btnBk2').onclick=function(){$('docsView').className='';$('app').className=''};
   $('btnSim').onclick=sim;
   $('btnClr').onclick=reset;
-
   window.loadEx=function(k){$('pktIn').value=EX[k]};
-
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&$('docsView').className.indexOf('show')>=0){$('docsView').className='';$('app').className=''}});
 })();
 </script>
