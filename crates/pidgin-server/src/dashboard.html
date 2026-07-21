@@ -6,13 +6,14 @@
 <title>pidgin // protocol sim</title>
 <style>
 :root {
-  --bg:#06080a;--panel:#0a0d10;--border:#111518;
+  --bg:#020406;--panel:#060a0e;--border:#0c1218;
   --accent:#00ff41;--green:#00ff41;--red:#ff2040;--yellow:#ffc400;
   --purple:#b44dff;--cyan:#00d4ff;--blue:#3d8bff;--orange:#ff8c00;
-  --ink:#c8ccd0;--dim:#6a727a;--muted:#3a424a;
+  --ink:#b8bcc4;--dim:#5a626a;--muted:#1a222a;
+  --glow-g:0 0 12px rgba(0,255,65,0.2);--glow-r:0 0 12px rgba(255,32,64,0.2);
 }
-*{margin:0;padding:0;box-sizing:border-box;font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono','Courier New',monospace}
-html,body{height:100%;overflow:hidden}
+*{margin:0;padding:0;box-sizing:border-box;font-family:'JetBrainsMono Nerd Font','FiraCode Nerd Font','CascadiaCode Nerd Font','SF Mono','Fira Code','Cascadia Code','Courier New',monospace}
+html,body{height:100%;overflow:hidden;background:#020406}
 
 #app{position:fixed;top:3px;left:3px;right:3px;bottom:3px;display:grid;grid-template-columns:200px 1fr 1fr;grid-template-rows:38px 1fr 120px 440px;gap:1px;background:var(--border)}
 #app>*{background:var(--panel);overflow:hidden;min-height:0;min-width:0}
@@ -127,6 +128,14 @@ html,body{height:100%;overflow:hidden}
 .db .bk:hover{border-color:var(--accent);color:var(--accent)}
 
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--muted)}
+
+/* dark web scanlines */
+#app::before{content:'';position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);pointer-events:none;z-index:9999}
+
+/* terminal glow on active elements */
+.hdr .brand{text-shadow:0 0 8px rgba(0,255,65,0.3)}
+.stg.run{box-shadow:inset 0 0 12px rgba(0,255,65,0.05)}
+.ac.on{box-shadow:0 0 16px rgba(0,255,65,0.08)}
 </style>
 </head>
 <body>
