@@ -6,147 +6,169 @@
 <title>pidgin // protocol sim</title>
 <style>
   :root {
-    --bg: #000000; --panel: #050505; --border: #0a0a0a;
-    --accent: #00ff41; --green: #00ff41; --red: #ff0040; --yellow: #ffae00; --purple: #b400ff; --blue: #0070ff; --cyan: #00e5ff;
-    --dim: #1a1a1a; --text: #2a2a2a; --bright: #3a3a3a; --white: #e0e0e0;
-    --glow: 0 0 4px rgba(0,255,65,0.3);
+    --bg: #06080a; --panel: #0a0d10; --border: #111518;
+    --accent: #00ff41; --green: #00ff41; --red: #ff2040; --yellow: #ffc400;
+    --purple: #b44dff; --cyan: #00d4ff; --blue: #3d8bff;
+    --ink: #c8ccd0; --dim: #5a626a; --muted: #333b44;
+    --glow-g: 0 0 8px rgba(0,255,65,0.15); --glow-r: 0 0 8px rgba(255,32,64,0.15);
   }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: 'SF Mono','Fira Code','Cascadia Code','Courier New',monospace; background:var(--bg); color:var(--text); height:100vh; overflow:hidden; }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono','Courier New',monospace;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden}
 
-  .grid {
-    display: grid;
-    grid-template-columns: 280px 1fr 1fr;
-    grid-template-rows: 32px 1fr 1fr 140px;
-    gap: 1px;
-    background: var(--border);
-    height: 100vh;
-  }
-  .grid > * { background: var(--panel); }
+  .shell{display:grid;grid-template-columns:240px 1fr;grid-template-rows:36px 1fr 160px;gap:1px;background:var(--border);height:100vh;padding:4px}
+  .shell>*{background:var(--panel)}
 
-  /* Header */
-  .hdr { grid-column:1/-1; display:flex; align-items:center; padding:0 12px; gap:12px; border-bottom:1px solid var(--border); }
-  .hdr .blink { width:5px; height:5px; border-radius:50%; background:var(--green); animation:bk 1.5s infinite; }
-  @keyframes bk { 0%,100%{opacity:1}50%{opacity:.15} }
-  .hdr .title { font-size:11px; color:var(--green); letter-spacing:2px; text-transform:uppercase; }
-  .hdr .sep { color:var(--dim); }
-  .hdr .info { font-size:10px; color:var(--dim); }
-  .hdr .info b { color:var(--text); font-weight:400; }
-  .hdr .right { margin-left:auto; display:flex; gap:16px; }
+  /* ── header ── */
+  .hdr{grid-column:1/-1;display:flex;align-items:center;padding:0 14px;gap:10px}
+  .hdr .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:var(--glow-g);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+  .hdr .brand{font-size:12px;color:var(--green);letter-spacing:3px;font-weight:700}
+  .hdr .ver{font-size:9px;color:var(--muted)}
+  .hdr .sep{color:var(--muted)}
+  .hdr .stat{font-size:10px;color:var(--dim)}
+  .hdr .stat b{color:var(--ink);font-weight:400}
+  .hdr .r{margin-left:auto;display:flex;align-items:center;gap:14px}
+  .hdr .live{font-size:9px;color:var(--green);letter-spacing:1px;display:flex;align-items:center;gap:5px}
+  .hdr .live::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
+  .hdr .docs-btn{font-size:9px;color:var(--dim);border:1px solid var(--border);padding:3px 8px;cursor:pointer;background:transparent;font-family:inherit;letter-spacing:1px;transition:all .15s}
+  .hdr .docs-btn:hover{border-color:var(--accent);color:var(--accent)}
 
-  /* Panels */
-  .panel { padding:8px 10px; display:flex; flex-direction:column; overflow:hidden; }
-  .ptitle { font-size:8px; color:var(--dim); text-transform:uppercase; letter-spacing:2px; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:6px; }
-  .ptitle::before { content:''; width:3px; height:3px; }
-  .ptitle.c::before { background:var(--green); }
-  .ptitle.p::before { background:var(--purple); }
-  .ptitle.y::before { background:var(--yellow); }
-  .ptitle.r::before { background:var(--red); }
-  .ptitle.b::before { background:var(--blue); }
+  /* ── sidebar: pipeline ── */
+  .side{grid-column:1;grid-row:2/4;display:flex;flex-direction:column;overflow:hidden}
+  .side-head{font-size:8px;color:var(--muted);letter-spacing:2px;padding:10px 12px 6px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+  .stages{flex:1;overflow-y:auto;padding:4px 0}
+  .stg{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:10px;color:var(--dim);position:relative}
+  .stg::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
+  .stg.idle::before{background:var(--muted)}
+  .stg.run::before{background:var(--accent);box-shadow:var(--glow-g)}
+  .stg.pass::before{background:var(--green)}
+  .stg.fail::before{background:var(--red);box-shadow:var(--glow-r)}
+  .stg.run{color:var(--ink);background:rgba(0,255,65,0.03)}
+  .stg.pass{color:var(--ink)}
+  .stg.fail{color:var(--red)}
+  .stg .idx{width:18px;text-align:right;color:var(--muted);font-size:9px}
+  .stg .nm{width:56px;font-weight:600;letter-spacing:1px}
+  .stg .info{margin-left:auto;font-size:9px;text-align:right}
 
-  /* Pipeline */
-  #pipeline { grid-column:1; grid-row:2/4; overflow-y:auto; }
-  .stg { display:flex; align-items:center; gap:6px; padding:5px 8px; margin-bottom:1px; font-size:10px; border-left:2px solid transparent; }
-  .stg.idle { border-left-color:var(--dim); }
-  .stg.run { border-left-color:var(--accent); background:rgba(0,255,65,0.03); }
-  .stg.pass { border-left-color:var(--green); }
-  .stg.fail { border-left-color:var(--red); }
-  .stg .n { color:var(--dim); width:16px; }
-  .stg .nm { color:var(--bright); width:60px; }
-  .stg .inf { color:var(--dim); font-size:9px; margin-left:auto; }
-  .stg .bar { position:absolute; bottom:0; left:0; height:1px; background:var(--accent); transition:width .2s; }
+  .side-stats{border-top:1px solid var(--border);padding:8px 12px}
+  .srow{display:flex;justify-content:space-between;font-size:9px;padding:2px 0}
+  .srow .k{color:var(--muted)}
+  .srow .v{color:var(--ink)}
+  .srow .v.g{color:var(--green)}
+  .srow .v.r{color:var(--red)}
 
-  /* Chat Comms */
-  #chat { grid-column:2/4; grid-row:2/4; overflow:hidden; }
-  .chat-scroll { height:100%; overflow-y:auto; padding-bottom:4px; }
-  .msg { margin-bottom:2px; display:flex; gap:8px; align-items:flex-start; padding:3px 6px; }
-  .msg .ts { color:var(--dim); font-size:9px; flex-shrink:0; width:56px; }
-  .msg .src { font-size:9px; flex-shrink:0; padding:1px 4px; border-radius:2px; text-transform:uppercase; font-weight:600; letter-spacing:1px; }
-  .msg .src.sys { background:#0a0a0a; color:var(--green); border:1px solid #0f0f0f; }
-  .msg .src.ag { background:#0a000a; color:var(--purple); border:1px solid #0f000f; }
-  .msg .src.srv { background:#000a0a; color:var(--cyan); border:1px solid #000f0f; }
-  .msg .src.err { background:#0a0000; color:var(--red); border:1px solid #0f0000; }
-  .msg .body { color:var(--text); font-size:10px; line-height:1.4; word-break:break-all; }
-  .msg .body .enc { color:var(--green); opacity:.6; }
-  .msg .body .key { color:var(--yellow); }
-  .msg .body .addr { color:var(--cyan); }
-  .msg .body .pkt { color:var(--purple); }
-  .msg .body .ok { color:var(--green); }
-  .msg .body .no { color:var(--red); }
-  .msg .body .warn { color:var(--yellow); }
-  .msg .hdr-line { color:var(--dim); font-size:9px; padding:2px 6px; }
-  .msg .hex { color:var(--dim); font-size:9px; opacity:.4; }
+  /* ── main: comms ── */
+  .main{grid-column:2;grid-row:2;display:flex;flex-direction:column;overflow:hidden}
+  .main-head{font-size:8px;color:var(--muted);letter-spacing:2px;padding:10px 14px 6px;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+  .main-head::before{content:'';width:4px;height:4px;background:var(--purple);border-radius:1px}
+  .comms{flex:1;overflow-y:auto;padding:6px 14px}
+  .msg{display:flex;gap:10px;padding:3px 0;font-size:10px;line-height:1.5;align-items:flex-start}
+  .msg+.msg{border-top:1px solid rgba(17,21,24,0.5)}
+  .msg .t{color:var(--muted);font-size:8px;flex-shrink:0;width:60px;padding-top:2px}
+  .msg .tag{font-size:8px;font-weight:700;letter-spacing:1px;flex-shrink:0;padding:2px 5px;border:1px solid var(--border);text-transform:uppercase}
+  .msg .tag.sys{color:var(--green);border-color:#0f2015}
+  .msg .tag.ag{color:var(--purple);border-color:#1a0f20}
+  .msg .tag.srv{color:var(--cyan);border-color:#0f1a20}
+  .msg .tag.err{color:var(--red);border-color:#200f10}
+  .msg .tag.net{color:var(--blue);border-color:#0f1520}
+  .msg .b{color:var(--dim);word-break:break-all;flex:1}
+  .msg .b .g{color:var(--green)}
+  .msg .b .r{color:var(--red)}
+  .msg .b .y{color:var(--yellow)}
+  .msg .b .c{color:var(--cyan)}
+  .msg .b .p{color:var(--purple)}
+  .msg .b .w{color:var(--ink)}
+  .msg .hex{color:var(--muted);opacity:.5;font-size:9px}
+  .msg .divider{color:var(--muted);padding:2px 0;font-size:9px;letter-spacing:3px;opacity:.3}
 
-  /* Inspector */
-  #inspector { grid-column:1; grid-row:4; overflow:hidden; display:flex; flex-direction:column; }
-  .insp-cols { flex:1; display:flex; gap:1px; background:var(--border); overflow:hidden; }
-  .insp-col { flex:1; background:var(--panel); padding:6px; overflow-y:auto; }
-  .insp-col .ct { font-size:8px; color:var(--dim); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:4px; }
-  .insp-col pre { font-size:10px; color:var(--text); line-height:1.4; white-space:pre-wrap; word-break:break-all; }
+  /* ── bottom: input + inspector ── */
+  .bottom{grid-column:2;grid-row:3;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+  .bottom>*{background:var(--panel)}
 
-  /* Input */
-  #input { grid-column:2; grid-row:4; padding:8px 10px; display:flex; flex-direction:column; gap:6px; }
-  #input textarea { flex:1; width:100%; background:var(--panel); border:1px solid var(--border); color:var(--green); font-family:inherit; font-size:10px; padding:6px; resize:none; outline:none; }
-  #input textarea:focus { border-color:var(--accent); }
-  #input .btn-row { display:flex; gap:4px; }
-  #input button { padding:4px 10px; border:none; background:var(--border); color:var(--text); font-family:inherit; font-size:10px; cursor:pointer; }
-  #input button:hover { background:var(--accent); color:#000; }
-  #input button.act { background:var(--accent); color:#000; }
+  .input-col{display:flex;flex-direction:column;padding:10px 14px;gap:6px;overflow:hidden}
+  .input-col .lbl{font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+  .input-col textarea{flex:1;width:100%;background:var(--bg);border:1px solid var(--border);color:var(--green);font-family:inherit;font-size:10px;padding:8px;resize:none;outline:none;line-height:1.5}
+  .input-col textarea:focus{border-color:var(--accent)}
+  .input-col .btns{display:flex;gap:4px}
+  .input-col button{padding:5px 12px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:inherit;font-size:9px;letter-spacing:1px;cursor:pointer;transition:all .12s}
+  .input-col button:hover{border-color:var(--ink);color:var(--ink)}
+  .input-col button.go{border-color:var(--accent);color:var(--accent)}
+  .input-col button.go:hover{background:var(--accent);color:var(--bg)}
 
-  /* Stats */
-  #stats { grid-column:3; grid-row:4; padding:8px 10px; }
-  .stat-row { display:flex; justify-content:space-between; font-size:10px; padding:2px 0; border-bottom:1px solid var(--border); }
-  .stat-row .k { color:var(--dim); }
-  .stat-row .v { color:var(--text); }
-  .stat-row .v.ok { color:var(--green); }
-  .stat-row .v.no { color:var(--red); }
+  .insp-col{display:flex;flex-direction:column;padding:10px 14px;overflow:hidden}
+  .insp-col .lbl{font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+  .insp-split{display:flex;flex:1;gap:1px;background:var(--border);overflow:hidden}
+  .insp-split .half{background:var(--panel);padding:8px;overflow-y:auto;flex:1}
+  .insp-split .half .hl{font-size:8px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
+  .insp-split pre{font-size:9px;color:var(--dim);line-height:1.5;white-space:pre-wrap;word-break:break-all}
 
-  ::-webkit-scrollbar { width:3px; }
-  ::-webkit-scrollbar-track { background:transparent; }
-  ::-webkit-scrollbar-thumb { background:var(--dim); }
+  /* ── docs overlay ── */
+  .docs-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;z-index:100;align-items:center;justify-content:center}
+  .docs-overlay.open{display:flex}
+  .docs-box{width:800px;max-height:85vh;background:var(--panel);border:1px solid var(--border);display:flex;flex-direction:column}
+  .docs-box .dhdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
+  .docs-box .dhdr .dt{font-size:11px;color:var(--green);letter-spacing:2px;font-weight:700}
+  .docs-box .dhdr button{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:inherit;font-size:9px;padding:4px 10px;cursor:pointer;letter-spacing:1px}
+  .docs-box .dhdr button:hover{border-color:var(--red);color:var(--red)}
+  .docs-box .dbody{flex:1;overflow-y:auto;padding:20px 24px;font-size:10px;color:var(--ink);line-height:1.7}
+  .docs-box .dbody h2{color:var(--green);font-size:12px;letter-spacing:2px;margin:16px 0 6px;font-weight:700}
+  .docs-box .dbody h3{color:var(--cyan);font-size:10px;letter-spacing:1px;margin:12px 0 4px}
+  .docs-box .dbody p{color:var(--dim);margin-bottom:8px}
+  .docs-box .dbody code{background:var(--bg);padding:1px 4px;color:var(--yellow);font-size:9px}
+  .docs-box .dbody pre{background:var(--bg);padding:10px;border:1px solid var(--border);margin:8px 0;overflow-x:auto;color:var(--dim);font-size:9px;line-height:1.5}
+  .docs-box .dbody .kw{color:var(--accent)}
+  .docs-box .dbody .field{color:var(--cyan)}
+  .docs-box .dbody .rule{color:var(--red)}
+
+  ::-webkit-scrollbar{width:3px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--muted)}
 </style>
 </head>
 <body>
-<div class="grid">
-  <!-- Header -->
+<div class="shell">
+  <!-- header -->
   <div class="hdr">
-    <div class="blink"></div>
-    <span class="title">pidgin</span>
-    <span class="sep">/</span>
-    <span class="info">v0.2.0</span>
-    <div class="right">
-      <span class="info"><b>host</b> <span id="hHost">--</span></span>
-      <span class="info"><b>uptime</b> <span id="hUp">0</span></span>
-      <span class="info"><b>pkts</b> <span id="hPkts">0</span></span>
-      <span class="info"><b>blocks</b> <span id="hBlocks">0</span></span>
-      <span class="info" id="hSt" style="color:var(--green)">ONLINE</span>
+    <div class="dot"></div>
+    <span class="brand">pidgin</span>
+    <span class="ver">v0.2.0</span>
+    <span class="sep">|</span>
+    <span class="stat"><b>host</b> <span id="hHost">--</span></span>
+    <span class="stat"><b>up</b> <span id="hUp">0s</span></span>
+    <span class="stat"><b>pkts</b> <span id="hPkts">0</span></span>
+    <span class="stat"><b>blk</b> <span id="hBlk">0</span></span>
+    <div class="r">
+      <span class="live">online</span>
+      <button class="docs-btn" onclick="toggleDocs()">DOCS</button>
     </div>
   </div>
 
-  <!-- Pipeline -->
-  <div class="panel" id="pipeline">
-    <div class="ptitle c">pipeline</div>
-    <div id="stages"></div>
-  </div>
-
-  <!-- Chat Comms -->
-  <div class="panel" id="chat">
-    <div class="ptitle p">encrypted comms</div>
-    <div class="chat-scroll" id="chatScroll"></div>
-  </div>
-
-  <!-- Inspector -->
-  <div class="panel" id="inspector">
-    <div class="ptitle y">packet</div>
-    <div class="insp-cols">
-      <div class="insp-col"><div class="ct">raw .pgn</div><pre id="rawPgn">--</pre></div>
-      <div class="insp-col"><div class="ct">expanded</div><pre id="expPgn">--</pre></div>
+  <!-- sidebar -->
+  <div class="side">
+    <div class="side-head">pipeline</div>
+    <div class="stages" id="stages"></div>
+    <div class="side-stats">
+      <div class="srow"><span class="k">packets</span><span class="v" id="sPkts">0</span></div>
+      <div class="srow"><span class="k">passed</span><span class="v g" id="sPass">0</span></div>
+      <div class="srow"><span class="k">blocked</span><span class="v r" id="sBlk">0</span></div>
+      <div class="srow"><span class="k">rules fired</span><span class="v" id="sRules">0</span></div>
+      <div class="srow"><span class="k">refs resolved</span><span class="v g" id="sRes">0</span></div>
+      <div class="srow"><span class="k">refs failed</span><span class="v r" id="sResF">0</span></div>
+      <div class="srow"><span class="k">latency</span><span class="v" id="sLat">--</span></div>
     </div>
   </div>
 
-  <!-- Input -->
-  <div class="panel" id="input">
-    <textarea id="pktIn" spellcheck="false">@run code.review
+  <!-- comms -->
+  <div class="main">
+    <div class="main-head">encrypted comms</div>
+    <div class="comms" id="comms"></div>
+  </div>
+
+  <!-- bottom -->
+  <div class="bottom">
+    <div class="input-col">
+      <div class="lbl">transmit .pgn</div>
+      <textarea id="pktIn" spellcheck="false">@run code.review
 wf=generic_review
 mode=draft
 in=[main.rs]
@@ -155,36 +177,99 @@ do=[draft,review]
 deny=[publish,send,delete,secrets]
 risk=med
 human=yes</textarea>
-    <div class="btn-row">
-      <button class="act" onclick="sim()">TRANSMIT</button>
-      <button onclick="reset()">CLR</button>
-      <button onclick="ex('safe')">safe</button>
-      <button onclick="ex('unsafe')">unsf</button>
-      <button onclick="ex('crit')">crit</button>
-      <button onclick="ex('trav')">trav</button>
+      <div class="btns">
+        <button class="go" onclick="sim()">TRANSMIT</button>
+        <button onclick="reset()">CLR</button>
+        <button onclick="ex('safe')">safe</button>
+        <button onclick="ex('unsafe')">unsafe</button>
+        <button onclick="ex('crit')">crit</button>
+        <button onclick="ex('trav')">path-trav</button>
+      </div>
+    </div>
+    <div class="insp-col">
+      <div class="lbl">packet inspector</div>
+      <div class="insp-split">
+        <div class="half"><div class="hl">raw .pgn</div><pre id="rawP">--</pre></div>
+        <div class="half"><div class="hl">expanded yaml</div><pre id="expP">--</pre></div>
+      </div>
     </div>
   </div>
+</div>
 
-  <!-- Stats -->
-  <div class="panel" id="stats">
-    <div class="ptitle b">telemetry</div>
-    <div class="stat-row"><span class="k">packets</span><span class="v" id="sPkts">0</span></div>
-    <div class="stat-row"><span class="k">passed</span><span class="v ok" id="sPass">0</span></div>
-    <div class="stat-row"><span class="k">blocked</span><span class="v no" id="sBlock">0</span></div>
-    <div class="stat-row"><span class="k">safety rules</span><span class="v" id="sRules">0</span></div>
-    <div class="stat-row"><span class="k">refs resolved</span><span class="v" id="sRes">0</span></div>
-    <div class="stat-row"><span class="k">refs failed</span><span class="v no" id="sResF">0</span></div>
-    <div class="stat-row"><span class="k">latency</span><span class="v" id="sLat">--</span></div>
-    <div class="stat-row"><span class="k">bytes recv</span><span class="v" id="sBytes">0</span></div>
-    <div class="stat-row"><span class="k">bytes sent</span><span class="v" id="sBytesR">0</span></div>
+<!-- docs overlay -->
+<div class="docs-overlay" id="docsOverlay">
+  <div class="docs-box">
+    <div class="dhdr">
+      <span class="dt">pidgin // documentation</span>
+      <button onclick="toggleDocs()">CLOSE [esc]</button>
+    </div>
+    <div class="dbody">
+      <h2>protocol overview</h2>
+      <p>Pidgin is a safety-gated agent-to-agent communication protocol. Every packet is parsed, validated against schema, checked against safety rules, resolved for references, and expanded into executable YAML before delivery.</p>
+
+      <h2>packet format</h2>
+      <p>9-line .pgn packets. First line is the directive. Required fields: <code>wf</code>, <code>mode</code>, <code>in</code>, <code>out</code>. Optional: <code>do</code>, <code>deny</code>, <code>risk</code>, <code>human</code>, <code>ttl</code>.</p>
+      <pre>@run &lt;run_id&gt;
+wf=&lt;workflow&gt;
+mode=draft|approval
+in=[&lt;inputs&gt;]
+out=[&lt;outputs&gt;]
+do=[&lt;actions&gt;]
+deny=[&lt;denied_actions&gt;]
+risk=low|med|crit
+human=yes|no</pre>
+
+      <h2>pipeline stages</h2>
+      <h3>01 LEXER</h3>
+      <p>Tokenizes raw .pgn text. Detects directive type (<code>@run</code>, <code>@log</code>, <code>@resolve</code>, <code>@emit</code>).</p>
+      <h3>02 PARSER</h3>
+      <p>Extracts key-value fields. Parses array syntax <code>[a,b,c]</code>. Generates run_id from directive.</p>
+      <h3>03 SYNTAX</h3>
+      <p>Validates required fields are present. Checks field types and value ranges.</p>
+      <h3>04 SCHEMA</h3>
+      <p>Validates against workflow schema. Checks risk level, human flag, mode permissions.</p>
+      <h3>05 SAFETY</h3>
+      <p>Evaluates 9 safety rules (SG-1 through SG-9). Blocks dangerous combinations. Can require human approval.</p>
+      <h3>06 RESOLVE</h3>
+      <p>Resolves reference aliases. Maps short names to full paths. Checks reference existence.</p>
+      <h3>07 EXPAND</h3>
+      <p>Generates full YAML execution spec. Includes routing, TTL, executor recommendation.</p>
+
+      <h2>safety rules</h2>
+      <pre>SG-1  deny contains actions from do
+SG-2  critical risk with human=no
+SG-3  publish/send in do
+SG-4  delete in do
+SG-5  secrets in do or deny
+SG-6  file traversal in inputs
+SG-7  missing human on critical
+SG-8  invalid risk level
+SG-9  approval mode without human</pre>
+
+      <h2>api endpoints</h2>
+      <pre>POST /api/v1/parse     -> parse directive, extract fields
+POST /api/v1/validate  -> check required fields
+POST /api/v1/check     -> safety + resolution in one call
+POST /api/v1/expand    -> generate full YAML
+POST /api/v1/run       -> execute full pipeline
+GET  /api/v1/health    -> server status</pre>
+
+      <h2>cli commands</h2>
+      <pre>pgn init              create .pidgin/ config
+pgn parse &lt;file&gt;      parse .pgn packet
+pgn validate &lt;file&gt;   validate fields
+pgn check &lt;file&gt;      safety + resolve
+pgn expand &lt;file&gt;     expand to YAML
+pgn run &lt;file&gt;        full pipeline
+pgn serve             start HTTP server
+pgn docs              show protocol docs</pre>
+    </div>
   </div>
 </div>
 
 <script>
 const $=id=>document.getElementById(id);
-let pkts=0,passed=0,blocks=0,rulesFired=0,refsOk=0,refsFail=0;
-let startTime=Date.now();
-let busy=false;
+let pkts=0,passed=0,blk=0,rules=0,res=0,resF=0,busy=false,t0=Date.now();
 
 const EX={
   safe:`@run code.review\nwf=generic_review\nmode=draft\nin=[main.rs]\nout=[review]\ndo=[draft,review]\ndeny=[publish,send,delete,secrets]\nrisk=med\nhuman=yes`,
@@ -194,212 +279,78 @@ const EX={
 };
 function ex(k){$('pktIn').value=EX[k]}
 
-// Timestamps
-function ts(){
-  const n=new Date();
-  return [n.getHours(),n.getMinutes(),n.getSeconds(),n.getMilliseconds()]
-    .map((v,i)=>i===3?String(v).padStart(3,'0'):String(v).padStart(2,'0'))
-    .join(':');
-}
+function ts(){const n=new Date();return[n.getHours(),n.getMinutes(),n.getSeconds(),n.getMilliseconds()].map((v,i)=>i===3?String(v).padStart(3,'0'):String(v).padStart(2,'0')).join(':')}
+function hx(s){return[...s].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')}
 
-// Uptime
-setInterval(()=>{
-  const s=Math.floor((Date.now()-startTime)/1000);
-  const m=Math.floor(s/60),h=Math.floor(m/60);
-  $('hUp').textContent=h>0?`${h}h${m%60}m`:m>0?`${m}m${s%60}s`:`${s}s`;
-},1000);
+setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000),m=Math.floor(s/60),h=Math.floor(m/60);$('hUp').textContent=h?`${h}h${m%60}m`:m?`${m}m${s%60}s`:`${s}s`},1000);
 
-// Health
-async function health(){
-  try{const r=await fetch('/api/v1/health');const d=await r.json();$('hHost').textContent=d.data.host.split('\\').pop()}
-  catch{$('hHost').textContent='--';$('hSt').textContent='OFFLINE';$('hSt').style.color='var(--red)'}
-}
+async function health(){try{const r=await fetch('/api/v1/health');const d=await r.json();$('hHost').textContent=d.data.host.split('\\').pop()}catch{$('hHost').textContent='--'}}
 health();
 
-// Pipeline
-const STAGES=['LEXER','PARSER','SYNTAX','SCHEMA','SAFETY','RESOLVE','EXPAND'];
-function initPipeline(){
-  $('stages').innerHTML='';
-  STAGES.forEach((s,i)=>{
-    const d=document.createElement('div');
-    d.className='stg idle';
-    d.id='st'+i;
-    d.innerHTML=`<span class="n">${String(i+1).padStart(2,'0')}</span><span class="nm">${s}</span><span class="inf">idle</span>`;
-    $('stages').appendChild(d);
-  });
-}
-initPipeline();
+// pipeline
+const ST=['LEXER','PARSER','SYNTAX','SCHEMA','SAFETY','RESOLVE','EXPAND'];
+function initStages(){$('stages').innerHTML='';ST.forEach((s,i)=>{const d=document.createElement('div');d.className='stg idle';d.id='s'+i;d.innerHTML=`<span class="idx">${String(i+1).padStart(2,'0')}</span><span class="nm">${s}</span><span class="info">idle</span>`;$('stages').appendChild(d)})}
+initStages();
+function setS(i,st,inf){const e=$('s'+i);e.className='stg '+st;e.querySelector('.inf').textContent=inf||st}
 
-function setSt(i,state,info){
-  const el=$('st'+i);
-  el.className='stg '+state;
-  el.querySelector('.inf').textContent=info||state;
-}
+// comms
+function msg(tag,cls,body){const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="t">${ts()}</span><span class="tag ${cls}">${tag}</span><span class="b">${body}</span>`;$('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight}
+function msgHex(tag,cls,hex,plain){const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="t">${ts()}</span><span class="tag ${cls}">${tag}</span><span class="b"><span class="hex">${hex}</span> <span class="w">&rarr;</span> <span class="c">${plain}</span></span>`;$('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight}
+function msgDiv(text){const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="t"></span><span class="tag" style="visibility:hidden">_</span><span class="divider">${'---'.repeat(20)} ${text} ${'---'.repeat(20)}</span>`;$('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight}
 
-// Chat
-function chat(type,src,cls,msg){
-  const d=document.createElement('div');
-  d.className='msg';
-  d.innerHTML=`<span class="ts">${ts()}</span><span class="src ${cls}">${src}</span><span class="body">${msg}</span>`;
-  $('chatScroll').appendChild(d);
-  $('chatScroll').scrollTop=$('chatScroll').scrollHeight;
-}
-function chatEnc(src,cls,hex,plain){
-  const d=document.createElement('div');
-  d.className='msg';
-  d.innerHTML=`<span class="ts">${ts()}</span><span class="src ${cls}">${src}</span><span class="body"><span class="enc">${hex}</span> <span class="key">&gt;</span> <span class="pkt">${plain}</span></span>`;
-  $('chatScroll').appendChild(d);
-  $('chatScroll').scrollTop=$('chatScroll').scrollHeight;
-}
-function chatHdr(msg){
-  const d=document.createElement('div');
-  d.className='hdr-line';
-  d.textContent='─'.repeat(20)+' '+msg+' ─'.repeat(20);
-  $('chatScroll').appendChild(d);
-  $('chatScroll').scrollTop=$('chatScroll').scrollHeight;
-}
+function upStats(){$('sPkts').textContent=pkts;$('sPass').textContent=passed;$('sBlk').textContent=blk;$('sRules').textContent=rules;$('sRes').textContent=res;$('sResF').textContent=resF;$('hPkts').textContent=pkts;$('hBlk').textContent=blk}
 
-// Stats
-function upStats(){
-  $('sPkts').textContent=pkts;
-  $('sPass').textContent=passed;
-  $('sBlock').textContent=blocks;
-  $('sRules').textContent=rulesFired;
-  $('sRes').textContent=refsOk;
-  $('sResF').textContent=refsFail;
-  $('hPkts').textContent=pkts;
-  $('hBlocks').textContent=blocks;
-}
-
-// Hex generator
-function hexStr(s){return[...s].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')}
-
-async function api(ep,body){
-  try{const r=await fetch('/api/v1/'+ep,{method:'POST',headers:{'Content-Type':'text/plain'},body});return await r.json()}
-  catch(e){return{ok:false,error:e.message}}
-}
+async function api(ep,body){try{const r=await fetch('/api/v1/'+ep,{method:'POST',headers:{'Content-Type':'text/plain'},body});return await r.json()}catch(e){return{ok:false,error:e.message}}}
 
 async function sim(){
-  if(busy)return;
-  busy=true;
-  const pgn=$('pktIn').value;
-  pkts++;
-  upStats();
+  if(busy)return;busy=true;
+  const pgn=$('pktIn').value;pkts++;upStats();
+  const t=performance.now();
+  msgDiv('SESSION');
+  msg('NET','net',`<span class="g">0x${Math.random().toString(16).slice(2,10)}</span> packet incoming`);
+  msgHex('AGENT','ag',hx(pgn.split('\n')[0]),pgn.split('\n')[0]);
+  await delay(60);
 
-  const t0=performance.now();
+  for(let i=0;i<7;i++){setS(i,'run','...');await delay(60+Math.random()*80)}
 
-  chatHdr('SESSION START');
-  chat('sys','SYS','sys',`<span class="addr">0x${Math.random().toString(16).slice(2,10)}</span> new packet incoming`);
-
-  // Input echo
-  const lines=pgn.split('\n');
-  chatEnc('AGENT','ag',hexStr(lines[0]),lines[0]);
-  await delay(80);
-
-  // Pipeline
-  for(let i=0;i<7;i++){
-    setSt(i,'run','processing');
-    await delay(100+Math.random()*150);
-  }
-
-  // Parse
   const pr=await api('parse',pgn);
-  if(pr.ok){
-    setSt(0,'pass',`dir=${pr.data.directive}`);
-    setSt(1,'pass',`id=${pr.data.run_id.slice(0,16)}`);
-    chat('sys','SRV','srv',`<span class="ok">PARSE_OK</span> directive=<span class="pkt">${pr.data.directive}</span> run_id=<span class="addr">${pr.data.run_id}</span>`);
-  }else{
-    setSt(0,'fail','err');setSt(1,'fail','err');
-    chat('sys','ERR','err',`<span class="no">PARSE_FAIL</span> ${pr.error}`);
-    blocks++;upStats();busy=false;return;
-  }
-  await delay(60);
+  if(pr.ok){setS(0,'pass',`dir=${pr.data.directive}`);setS(1,'pass',`id=${pr.data.run_id.slice(0,12)}`);msg('SRV','srv',`<span class="g">PARSE_OK</span> directive=<span class="c">${pr.data.directive}</span> run_id=<span class="p">${pr.data.run_id}</span>`)}
+  else{setS(0,'fail','err');setS(1,'fail','err');msg('ERR','err',`<span class="r">PARSE_FAIL</span> ${pr.error}`);blk++;upStats();busy=false;return}
+  await delay(40);
 
-  // Validate
   const vr=await api('validate',pgn);
-  if(vr.ok&&vr.data.length===0){
-    setSt(2,'pass','0 errors');
-    chat('sys','SRV','srv',`<span class="ok">VALIDATE_OK</span> schema=PASS fields=9`);
-  }else{
-    setSt(2,'fail',`${vr.data.length} err`);
-    chat('sys','SRV','srv',`<span class="no">VALIDATE_FAIL</span> ${vr.data.length} errors`);
-    vr.data.forEach(e=>chat('sys','SRV','srv',`  <span class="no">${e.code}</span> ${e.message}`));
-    blocks++;upStats();busy=false;return;
-  }
-  await delay(60);
+  if(vr.ok&&vr.data.length===0){setS(2,'pass','ok');msg('SRV','srv',`<span class="g">VALIDATE_OK</span> all fields present`)}
+  else{setS(2,'fail',`${vr.data.length} err`);msg('SRV','srv',`<span class="r">VALIDATE_FAIL</span> ${vr.data.length} errors`);vr.data.forEach(e=>msg('SRV','srv',`  <span class="r">${e.code}</span> ${e.message}`));blk++;upStats();busy=false;return}
+  await delay(40);
 
-  // Schema
-  setSt(3,'pass','ok');
-  chat('sys','SRV','srv',`<span class="ok">SCHEMA_OK</span> wf=<span class="key">generic_review</span> risk=<span class="warn">${(pgn.match(/risk=(\w+)/)||[])[1]||'?'}</span> human=<span class="pkt">${(pgn.match(/human=(\w+)/)||[])[1]||'?'}</span>`);
-  await delay(60);
+  setS(3,'pass','ok');msg('SRV','srv',`<span class="g">SCHEMA_OK</span> wf=<span class="y">${(pgn.match(/risk=(\w+)/)||[])[1]||'?'}</span> risk=<span class="y">${(pgn.match(/risk=(\w+)/)||[])[1]||'?'}</span>`);
+  await delay(40);
 
-  // Check (safety + resolve)
   const cr=await api('check',pgn);
   if(cr.ok){
-    const s=cr.data.safety;
-    const res=cr.data.resolution;
-    if(s.blocked){
-      setSt(4,'fail',`BLOCKED`);
-      chat('sys','SRV','srv',`<span class="no">SAFETY_BLOCK</span> rules fired: ${s.fired_rules.map(r=>`<span class="key">${r}</span>`).join(', ')}`);
-      blocks++;rulesFired+=s.fired_rules.length;
-    }else{
-      setSt(4,'pass',`${s.fired_rules.length} rules`);
-      chat('sys','SRV','srv',`<span class="ok">SAFETY_PASS</span> ${s.fired_rules.length} rules evaluated`);
-      rulesFired+=s.fired_rules.length;
-    }
-    if(s.human_required) chat('sys','SRV','srv',`<span class="warn">HUMAN_REQUIRED</span> manual approval gate`);
+    const s=cr.data.safety,r=cr.data.resolution;
+    if(s.blocked){setS(4,'fail','BLOCKED');msg('SRV','srv',`<span class="r">SAFETY_BLOCK</span> ${s.fired_rules.map(x=>`<span class="y">${x}</span>`).join(', ')}`);blk++;rules+=s.fired_rules.length}
+    else{setS(4,'pass',`${s.fired_rules.length} rules`);msg('SRV','srv',`<span class="g">SAFETY_PASS</span> ${s.fired_rules.length} evaluated`);rules+=s.fired_rules.length}
+    if(s.human_required)msg('SRV','srv',`<span class="y">HUMAN_REQUIRED</span> approval gate active`);
+    const ok=r.filter(x=>x.status==='RESOLVED'),bad=r.filter(x=>x.status!=='RESOLVED');
+    res+=ok.length;resF+=bad.length;setS(5,bad.length?'fail':'pass',`${ok.length}r/${bad.length}u`);
+    if(ok.length)msg('SRV','srv',`<span class="g">RESOLVED</span> ${ok.map(x=>`<span class="c">${x.original}</span>`).join(', ')}`);
+    bad.forEach(x=>msg('SRV','srv',`<span class="r">UNRESOLVED</span> <span class="c">${x.original}</span> status=${x.status}`));
+  }else{setS(4,'fail','err');setS(5,'fail','err');msg('ERR','err',`<span class="r">CHECK_FAIL</span> ${cr.error}`);blk++;upStats();busy=false;return}
+  await delay(40);
 
-    const ok=res.filter(r=>r.status==='RESOLVED');
-    const bad=res.filter(r=>r.status!=='RESOLVED');
-    refsOk+=ok.length;refsFail+=bad.length;
-    setSt(5,bad.length===0?'pass':'fail',`${ok.length}r/${bad.length}u`);
-    if(ok.length>0) chat('sys','SRV','srv',`<span class="ok">RESOLVED</span> ${ok.map(r=>`<span class="addr">${r.original}</span>`).join(', ')}`);
-    bad.forEach(r=>chat('sys','SRV','srv',`<span class="no">UNRESOLVED</span> <span class="addr">${r.original}</span> status=${r.status}`));
-  }else{
-    setSt(4,'fail','err');setSt(5,'fail','err');
-    chat('sys','ERR','err',`<span class="no">CHECK_FAIL</span> ${cr.error}`);
-    blocks++;upStats();busy=false;return;
-  }
-  await delay(60);
-
-  // Expand
   const er=await api('expand',pgn);
-  if(er.ok){
-    setSt(6,'pass','done');
-    $('rawPgn').textContent=pgn;
-    $('expPgn').textContent=er.data.yaml;
-    chat('sys','SRV','srv',`<span class="ok">EXPAND_OK</span> route=<span class="addr">${er.data.route.match(/executor: (\w+)/)?.[1]||'?'}</span> ttl=24h`);
-    chatEnc('SRV','srv',hexStr(er.data.route.slice(0,40)),er.data.route.slice(0,60)+'...');
-    passed++;
-  }else{
-    setSt(6,'fail','err');
-    chat('sys','ERR','err',`<span class="no">EXPAND_FAIL</span> ${er.error}`);
-    blocks++;
-  }
+  if(er.ok){setS(6,'pass','done');$('rawP').textContent=pgn;$('expP').textContent=er.data.yaml;msg('SRV','srv',`<span class="g">EXPAND_OK</span> route=<span class="c">${er.data.route.match(/executor: (\w+)/)?.[1]||'?'}</span> ttl=24h`);msgHex('SRV','srv',hx(er.data.route.slice(0,30)),er.data.route.slice(0,50)+'...');passed++}
+  else{setS(6,'fail','err');msg('ERR','err',`<span class="r">EXPAND_FAIL</span> ${er.error}`);blk++}
 
-  const lat=(performance.now()-t0).toFixed(0);
-  $('sLat').textContent=lat+'ms';
-  $('sBytes').textContent=(pgn.length*2)+'b';
-  $('sBytesR').textContent=er.ok?(er.data.yaml.length*2)+'b':'0b';
-
-  chatHdr('SESSION END');
-  upStats();
-  busy=false;
+  $('sLat').textContent=(performance.now()-t).toFixed(0)+'ms';
+  msgDiv('END');upStats();busy=false
 }
 
-function reset(){
-  busy=false;
-  initPipeline();
-  $('chatScroll').innerHTML='';
-  $('rawPgn').textContent='--';
-  $('expPgn').textContent='--';
-  pkts=passed=blocks=rulesFired=refsOk=refsFail=0;
-  upStats();
-  $('sLat').textContent='--';
-  $('sBytes').textContent='0';
-  $('sBytesR').textContent='0';
-  chat('sys','SYS','sys','session cleared');
-}
+function reset(){busy=false;initStages();$('comms').innerHTML='';$('rawP').textContent='--';$('expP').textContent='--';pkts=passed=blk=rules=res=resF=0;upStats();$('sLat').textContent='--';msg('SYS','sys','session cleared')}
+
+function toggleDocs(){$('docsOverlay').classList.toggle('open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('docsOverlay').classList.remove('open')});
 
 function delay(ms){return new Promise(r=>setTimeout(r,ms))}
 </script>
