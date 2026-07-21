@@ -133,54 +133,7 @@ impl MetricsState {
             packets_blocked: 0,
             events: VecDeque::with_capacity(100),
             logs: VecDeque::with_capacity(500),
-            agents: {
-                let mut m = HashMap::new();
-                m.insert("orchestrator".into(), AgentStatus {
-                    name: "Orchestrator".into(), role: "orchestrator".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 16.0, mem_mb: 423, queue: 12, last_seen: now,
-                });
-                m.insert("runtime".into(), AgentStatus {
-                    name: "Pidgin Runtime".into(), role: "orchestrator".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 22.0, mem_mb: 526, queue: 18, last_seen: now,
-                });
-                m.insert("safety_gate".into(), AgentStatus {
-                    name: "Safety Gate".into(), role: "safety".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 27.0, mem_mb: 382, queue: 6, last_seen: now,
-                });
-                m.insert("deep_research".into(), AgentStatus {
-                    name: "DeepResearch".into(), role: "researcher".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 31.0, mem_mb: 872, queue: 23, last_seen: now,
-                });
-                m.insert("executor_a".into(), AgentStatus {
-                    name: "Executor A".into(), role: "executor".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 34.0, mem_mb: 362, queue: 41, last_seen: now,
-                });
-                m.insert("executor_b".into(), AgentStatus {
-                    name: "Executor B".into(), role: "executor".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 29.0, mem_mb: 515, queue: 37, last_seen: now,
-                });
-                m.insert("memory_archivist".into(), AgentStatus {
-                    name: "Memory Archivist".into(), role: "memory".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 18.0, mem_mb: 611, queue: 9, last_seen: now,
-                });
-                m.insert("human_approval".into(), AgentStatus {
-                    name: "Human Approval".into(), role: "approver".into(), kind: "agent".into(),
-                    status: "awaiting".into(), cpu: 12.0, mem_mb: 234, queue: 2, last_seen: now,
-                });
-                m.insert("outpost".into(), AgentStatus {
-                    name: "Outpost".into(), role: "remote".into(), kind: "agent".into(),
-                    status: "live".into(), cpu: 16.0, mem_mb: 312, queue: 14, last_seen: now,
-                });
-                m.insert("redis".into(), AgentStatus {
-                    name: "Redis".into(), role: "memory".into(), kind: "infra".into(),
-                    status: "live".into(), cpu: 17.0, mem_mb: 512, queue: 26, last_seen: now,
-                });
-                m.insert("logger".into(), AgentStatus {
-                    name: "Logger".into(), role: "observer".into(), kind: "infra".into(),
-                    status: "live".into(), cpu: 13.0, mem_mb: 498, queue: 16, last_seen: now,
-                });
-                m
-            },
+            agents: HashMap::new(),
             throughput: {
                 let mut d = VecDeque::with_capacity(80);
                 for i in 0..80 { d.push_back(ThroughputPoint {
