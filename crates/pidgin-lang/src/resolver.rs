@@ -24,7 +24,7 @@ pub struct ResolvedRef {
     pub status: ResolutionStatus,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ReferenceAliases {
     pub aliases: BTreeMap<String, String>,
     pub common: BTreeMap<String, String>,

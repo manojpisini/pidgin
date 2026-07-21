@@ -142,6 +142,14 @@ enum Commands {
 
     /// Print full documentation for agents (grammar, CLI, safety, integration)
     Docs,
+
+    /// Start the HTTP server
+    Serve {
+        #[arg(long, default_value = "0.0.0.0:3847")]
+        bind: std::net::SocketAddr,
+        #[arg(long, default_value = ".")]
+        host: PathBuf,
+    },
 }
 
 const DEFAULT_RUNTIME_CONFIG: &str = r#"runtime:
@@ -309,7 +317,8 @@ fn get_required_inputs(
         .unwrap_or_default()
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
 
     match cli.command {
@@ -977,6 +986,13 @@ fn main() {
                     eprintln!("docs/SPEC.md not found in repository");
                     std::process::exit(1);
                 }
+            }
+        }
+
+        Commands::Serve { bind, host } => {
+            if let Err(e) = pidgin_server::serve(bind, host).await {
+                eprintln!("server error: {}", e);
+                std::process::exit(1);
             }
         }
     }
