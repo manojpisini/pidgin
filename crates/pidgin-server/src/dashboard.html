@@ -237,31 +237,31 @@ context_id=ctx_abc123</textarea>
   </div>
   <div class="ds">
     <div class="ng">protocol</div>
-    <div class="ni on">overview</div>
-    <div class="ni">packet format</div>
-    <div class="ni">handoff fields</div>
-    <div class="ni">context transfer</div>
-    <div class="ni">directives</div>
+    <div class="ni on" data-target="sec-overview">overview</div>
+    <div class="ni" data-target="sec-format">packet format</div>
+    <div class="ni" data-target="sec-handoff">handoff fields</div>
+    <div class="ni" data-target="sec-context">context transfer</div>
+    <div class="ni" data-target="sec-directive">directives</div>
     <div class="ng">pipeline</div>
-    <div class="ni">01 lexer</div>
-    <div class="ni">02 parser</div>
-    <div class="ni">03 syntax</div>
-    <div class="ni">04 schema</div>
-    <div class="ni">05 safety</div>
-    <div class="ni">06 resolve</div>
-    <div class="ni">07 expand</div>
+    <div class="ni" data-target="sec-lexer">01 lexer</div>
+    <div class="ni" data-target="sec-parser">02 parser</div>
+    <div class="ni" data-target="sec-syntax">03 syntax</div>
+    <div class="ni" data-target="sec-schema">04 schema</div>
+    <div class="ni" data-target="sec-safety">05 safety</div>
+    <div class="ni" data-target="sec-resolve">06 resolve</div>
+    <div class="ni" data-target="sec-expand">07 expand</div>
     <div class="ng">safety</div>
-    <div class="ni">rules SG-1..10</div>
+    <div class="ni" data-target="sec-rules">rules SG-1..10</div>
     <div class="ng">api + cli</div>
-    <div class="ni">endpoints</div>
-    <div class="ni">commands</div>
+    <div class="ni" data-target="sec-api">endpoints</div>
+    <div class="ni" data-target="sec-cli">commands</div>
   </div>
-  <div class="db">
+  <div class="db" id="docsBody">
     <button class="bk" id="btnBk2">&larr; simulator</button>
-    <h1>protocol overview</h1>
+    <h1 id="sec-overview">protocol overview</h1>
     <p>Pidgin is a safety-gated agent-to-agent communication protocol. Every packet travels through a 7-stage pipeline: lex, parse, syntax, schema, safety, resolve, expand.</p>
     <p>The protocol enforces a deny-list model. Agents declare allowed and denied actions. Safety rules block dangerous combinations.</p>
-    <h1>packet format</h1>
+    <h1 id="sec-format">packet format</h1>
     <pre>@run &lt;run_id&gt;
 wf=&lt;workflow&gt;         mode=draft|approval
 in=[&lt;inputs&gt;]          out=[&lt;outputs&gt;]
@@ -270,13 +270,13 @@ risk=low|med|crit      human=yes|no
 ttl=24                 note="text"</pre>
     <h3>required</h3><ul><li>wf, mode, in, out</li></ul>
     <h3>optional</h3><ul><li>do, deny, risk, human, ttl, note</li></ul>
-    <h1>handoff fields</h1>
+    <h1 id="sec-handoff">handoff fields</h1>
     <pre>from=agent_alpha        to=agent_beta
 chain=[alpha,beta,gamma]
 handoff=forward|relay|delegate
 reply_to=&lt;run_id&gt;      origin=&lt;run_id&gt;</pre>
     <h3>modes</h3><ul><li>forward - pass unchanged</li><li>relay - process and re-wrap</li><li>delegate - full transfer</li></ul>
-    <h1>context transfer</h1>
+    <h1 id="sec-context">context transfer</h1>
     <pre>context_file=[file:path/to/doc.md]
 context_id=ctx_abc123
 context="inline text"
@@ -285,16 +285,16 @@ context_b64=SGVsbG8...</pre>
     <ul><li>context_file - file references</li><li>context_id - pointer to store</li><li>context - inline string</li><li>context_b64 - base64 binary</li></ul>
     <h3>limits</h3>
     <ul><li>inline: max 4KB</li><li>context_file: unlimited</li><li>context_id: unlimited</li><li>context_b64: max 1MB</li></ul>
-    <h1>directives</h1><ul><li>@run execute workflow</li><li>@result task outcome</li><li>@approval human sign-off</li><li>@context request context</li></ul>
+    <h1 id="sec-directive">directives</h1><ul><li>@run execute workflow</li><li>@result task outcome</li><li>@approval human sign-off</li><li>@context request context</li></ul>
     <h1>pipeline</h1>
-    <h2>01 LEXER</h2><p>Tokenizes raw text, detects directive.</p>
-    <h2>02 PARSER</h2><p>Extracts key-value, parses arrays.</p>
-    <h2>03 SYNTAX</h2><p>Validates required fields, types.</p>
-    <h2>04 SCHEMA</h2><p>Workflow schema validation.</p>
-    <h2>05 SAFETY</h2><p>Evaluates 10 safety rules.</p>
-    <h2>06 RESOLVE</h2><p>Resolves reference aliases.</p>
-    <h2>07 EXPAND</h2><p>Generates YAML execution spec.</p>
-    <h1>safety rules</h1>
+    <h2 id="sec-lexer">01 LEXER</h2><p>Tokenizes raw text, detects directive.</p>
+    <h2 id="sec-parser">02 PARSER</h2><p>Extracts key-value, parses arrays.</p>
+    <h2 id="sec-syntax">03 SYNTAX</h2><p>Validates required fields, types.</p>
+    <h2 id="sec-schema">04 SCHEMA</h2><p>Workflow schema validation.</p>
+    <h2 id="sec-safety">05 SAFETY</h2><p>Evaluates 10 safety rules.</p>
+    <h2 id="sec-resolve">06 RESOLVE</h2><p>Resolves reference aliases.</p>
+    <h2 id="sec-expand">07 EXPAND</h2><p>Generates YAML execution spec.</p>
+    <h1 id="sec-rules">safety rules</h1>
     <pre>SG-1   deny contains actions from do
 SG-2   critical risk with human=no
 SG-3   publish/send in do
@@ -305,11 +305,11 @@ SG-7   missing human on critical
 SG-8   invalid risk level
 SG-9   approval mode without human=yes
 SG-10  chain depth exceeded</pre>
-    <h1>api</h1>
+    <h1 id="sec-api">api</h1>
     <pre>POST /api/v1/parse      POST /api/v1/validate
 POST /api/v1/check      POST /api/v1/expand
 POST /api/v1/run        GET  /api/v1/health</pre>
-    <h1>cli</h1>
+    <h1 id="sec-cli">cli</h1>
     <pre>pgn init|parse|validate|check|expand|run|serve|docs</pre>
   </div>
 </div>
@@ -516,6 +516,21 @@ POST /api/v1/run        GET  /api/v1/health</pre>
   $('btnSim').onclick=sim;
   $('btnClr').onclick=reset;
   window.loadEx=function(k){$('pktIn').value=EX[k]};
+
+  // docs navigation
+  var navItems=document.querySelectorAll('.ds .ni');
+  for(var i=0;i<navItems.length;i++){
+    navItems[i].onclick=function(){
+      var target=this.getAttribute('data-target');
+      var el=document.getElementById(target);
+      if(el){
+        el.scrollIntoView({behavior:'smooth',block:'start'});
+        for(var j=0;j<navItems.length;j++)navItems[j].className='ni';
+        this.className='ni on';
+      }
+    };
+  }
+
   document.addEventListener('keydown',function(e){if(e.key==='Escape'&&$('docsView').className.indexOf('show')>=0){$('docsView').className='';$('app').className=''}});
 })();
 </script>
