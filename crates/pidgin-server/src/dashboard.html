@@ -6,19 +6,26 @@
 <title>pidgin // protocol sim</title>
 <style>
   :root {
-    --bg: #06080a; --panel: #0a0d10; --border: #111518;
-    --accent: #00ff41; --green: #00ff41; --red: #ff2040; --yellow: #ffc400;
-    --purple: #b44dff; --cyan: #00d4ff; --blue: #3d8bff;
-    --ink: #c8ccd0; --dim: #5a626a; --muted: #333b44;
-    --glow-g: 0 0 8px rgba(0,255,65,0.15); --glow-r: 0 0 8px rgba(255,32,64,0.15);
+    --bg:#06080a;--panel:#0a0d10;--border:#111518;
+    --accent:#00ff41;--green:#00ff41;--red:#ff2040;--yellow:#ffc400;
+    --purple:#b44dff;--cyan:#00d4ff;--blue:#3d8bff;
+    --ink:#c8ccd0;--dim:#5a626a;--muted:#333b44;
+    --glow-g:0 0 8px rgba(0,255,65,0.15);--glow-r:0 0 8px rgba(255,32,64,0.15);
   }
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'SF Mono','Fira Code','Cascadia Code','JetBrains Mono','Courier New',monospace;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden}
 
-  .shell{display:grid;grid-template-columns:240px 1fr;grid-template-rows:36px 1fr 160px;gap:1px;background:var(--border);height:100vh;padding:4px}
+  /* ── main app ── */
+  .shell{display:grid;grid-template-columns:220px 1fr 1fr;grid-template-rows:34px 1fr 220px;gap:1px;background:var(--border);height:100vh;padding:4px}
   .shell>*{background:var(--panel)}
 
-  /* ── header ── */
+  /* ── docs full page ── */
+  .docs-page{display:none;grid-template-columns:220px 1fr;grid-template-rows:34px 1fr;gap:1px;background:var(--border);height:100vh;padding:4px}
+  .docs-page>*{background:var(--panel)}
+  .docs-page.open{display:grid}
+  .shell.hidden{display:none}
+
+  /* shared */
   .hdr{grid-column:1/-1;display:flex;align-items:center;padding:0 14px;gap:10px}
   .hdr .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:var(--glow-g);animation:pulse 2s infinite}
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
@@ -30,14 +37,15 @@
   .hdr .r{margin-left:auto;display:flex;align-items:center;gap:14px}
   .hdr .live{font-size:9px;color:var(--green);letter-spacing:1px;display:flex;align-items:center;gap:5px}
   .hdr .live::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--green);animation:pulse 1.5s infinite}
-  .hdr .docs-btn{font-size:9px;color:var(--dim);border:1px solid var(--border);padding:3px 8px;cursor:pointer;background:transparent;font-family:inherit;letter-spacing:1px;transition:all .15s}
-  .hdr .docs-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .hdr .nav-btn{font-size:9px;color:var(--dim);border:1px solid var(--border);padding:3px 8px;cursor:pointer;background:transparent;font-family:inherit;letter-spacing:1px;transition:all .12s}
+  .hdr .nav-btn:hover{border-color:var(--accent);color:var(--accent)}
+  .hdr .nav-btn.active{border-color:var(--accent);color:var(--accent)}
 
-  /* ── sidebar: pipeline ── */
+  /* ── sidebar ── */
   .side{grid-column:1;grid-row:2/4;display:flex;flex-direction:column;overflow:hidden}
   .side-head{font-size:8px;color:var(--muted);letter-spacing:2px;padding:10px 12px 6px;text-transform:uppercase;border-bottom:1px solid var(--border)}
   .stages{flex:1;overflow-y:auto;padding:4px 0}
-  .stg{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:10px;color:var(--dim);position:relative}
+  .stg{display:flex;align-items:center;gap:6px;padding:5px 12px;font-size:10px;color:var(--dim);position:relative}
   .stg::before{content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--border)}
   .stg.idle::before{background:var(--muted)}
   .stg.run::before{background:var(--accent);box-shadow:var(--glow-g)}
@@ -49,7 +57,6 @@
   .stg .idx{width:18px;text-align:right;color:var(--muted);font-size:9px}
   .stg .nm{width:56px;font-weight:600;letter-spacing:1px}
   .stg .info{margin-left:auto;font-size:9px;text-align:right}
-
   .side-stats{border-top:1px solid var(--border);padding:8px 12px}
   .srow{display:flex;justify-content:space-between;font-size:9px;padding:2px 0}
   .srow .k{color:var(--muted)}
@@ -57,20 +64,23 @@
   .srow .v.g{color:var(--green)}
   .srow .v.r{color:var(--red)}
 
-  /* ── main: comms ── */
-  .main{grid-column:2;grid-row:2;display:flex;flex-direction:column;overflow:hidden}
-  .main-head{font-size:8px;color:var(--muted);letter-spacing:2px;padding:10px 14px 6px;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
-  .main-head::before{content:'';width:4px;height:4px;background:var(--purple);border-radius:1px}
-  .comms{flex:1;overflow-y:auto;padding:6px 14px}
-  .msg{display:flex;gap:10px;padding:3px 0;font-size:10px;line-height:1.5;align-items:flex-start}
+  /* ── comms ── */
+  #commsPanel{overflow:hidden;display:flex;flex-direction:column}
+  .phead{font-size:8px;color:var(--muted);letter-spacing:2px;padding:8px 12px 5px;text-transform:uppercase;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
+  .phead::before{content:'';width:4px;height:4px;border-radius:1px}
+  .phead.c-p::before{background:var(--purple)}
+  .phead.c-e::before{background:var(--red)}
+  .comms-scroll{flex:1;overflow-y:auto;padding:4px 12px}
+  .msg{display:flex;gap:8px;padding:3px 0;font-size:10px;line-height:1.5;align-items:flex-start}
   .msg+.msg{border-top:1px solid rgba(17,21,24,0.5)}
-  .msg .t{color:var(--muted);font-size:8px;flex-shrink:0;width:60px;padding-top:2px}
-  .msg .tag{font-size:8px;font-weight:700;letter-spacing:1px;flex-shrink:0;padding:2px 5px;border:1px solid var(--border);text-transform:uppercase}
+  .msg .t{color:var(--muted);font-size:8px;flex-shrink:0;width:56px;padding-top:2px}
+  .msg .tag{font-size:7px;font-weight:700;letter-spacing:1px;flex-shrink:0;padding:2px 4px;border:1px solid var(--border);text-transform:uppercase}
   .msg .tag.sys{color:var(--green);border-color:#0f2015}
   .msg .tag.ag{color:var(--purple);border-color:#1a0f20}
   .msg .tag.srv{color:var(--cyan);border-color:#0f1a20}
   .msg .tag.err{color:var(--red);border-color:#200f10}
   .msg .tag.net{color:var(--blue);border-color:#0f1520}
+  .msg .tag.evt{color:var(--yellow);border-color:#201a0f}
   .msg .b{color:var(--dim);word-break:break-all;flex:1}
   .msg .b .g{color:var(--green)}
   .msg .b .r{color:var(--red)}
@@ -81,10 +91,20 @@
   .msg .hex{color:var(--muted);opacity:.5;font-size:9px}
   .msg .divider{color:var(--muted);padding:2px 0;font-size:9px;letter-spacing:3px;opacity:.3}
 
-  /* ── bottom: input + inspector ── */
-  .bottom{grid-column:2;grid-row:3;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
-  .bottom>*{background:var(--panel)}
+  /* ── event log ── */
+  .elog-entry{display:flex;gap:6px;padding:2px 0;font-size:9px;line-height:1.4;border-bottom:1px solid rgba(17,21,24,0.3)}
+  .elog-entry .et{color:var(--muted);flex-shrink:0;width:50px}
+  .elog-entry .elvl{flex-shrink:0;width:36px;font-weight:700;font-size:8px;letter-spacing:1px;text-transform:uppercase}
+  .elog-entry .elvl.info{color:var(--cyan)}
+  .elog-entry .elvl.ok{color:var(--green)}
+  .elog-entry .elvl.warn{color:var(--yellow)}
+  .elog-entry .elvl.err{color:var(--red)}
+  .elog-entry .elvl.debug{color:var(--muted)}
+  .elog-entry .emsg{color:var(--dim);word-break:break-all;flex:1}
 
+  /* ── bottom ── */
+  .bot{grid-column:2/4;display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border)}
+  .bot>*{background:var(--panel)}
   .input-col{display:flex;flex-direction:column;padding:10px 14px;gap:6px;overflow:hidden}
   .input-col .lbl{font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
   .input-col textarea{flex:1;width:100%;background:var(--bg);border:1px solid var(--border);color:var(--green);font-family:inherit;font-size:10px;padding:8px;resize:none;outline:none;line-height:1.5}
@@ -94,7 +114,6 @@
   .input-col button:hover{border-color:var(--ink);color:var(--ink)}
   .input-col button.go{border-color:var(--accent);color:var(--accent)}
   .input-col button.go:hover{background:var(--accent);color:var(--bg)}
-
   .insp-col{display:flex;flex-direction:column;padding:10px 14px;overflow:hidden}
   .insp-col .lbl{font-size:8px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
   .insp-split{display:flex;flex:1;gap:1px;background:var(--border);overflow:hidden}
@@ -102,23 +121,26 @@
   .insp-split .half .hl{font-size:8px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
   .insp-split pre{font-size:9px;color:var(--dim);line-height:1.5;white-space:pre-wrap;word-break:break-all}
 
-  /* ── docs overlay ── */
-  .docs-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;z-index:100;align-items:center;justify-content:center}
-  .docs-overlay.open{display:flex}
-  .docs-box{width:800px;max-height:85vh;background:var(--panel);border:1px solid var(--border);display:flex;flex-direction:column}
-  .docs-box .dhdr{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)}
-  .docs-box .dhdr .dt{font-size:11px;color:var(--green);letter-spacing:2px;font-weight:700}
-  .docs-box .dhdr button{background:transparent;border:1px solid var(--border);color:var(--dim);font-family:inherit;font-size:9px;padding:4px 10px;cursor:pointer;letter-spacing:1px}
-  .docs-box .dhdr button:hover{border-color:var(--red);color:var(--red)}
-  .docs-box .dbody{flex:1;overflow-y:auto;padding:20px 24px;font-size:10px;color:var(--ink);line-height:1.7}
-  .docs-box .dbody h2{color:var(--green);font-size:12px;letter-spacing:2px;margin:16px 0 6px;font-weight:700}
-  .docs-box .dbody h3{color:var(--cyan);font-size:10px;letter-spacing:1px;margin:12px 0 4px}
-  .docs-box .dbody p{color:var(--dim);margin-bottom:8px}
-  .docs-box .dbody code{background:var(--bg);padding:1px 4px;color:var(--yellow);font-size:9px}
-  .docs-box .dbody pre{background:var(--bg);padding:10px;border:1px solid var(--border);margin:8px 0;overflow-x:auto;color:var(--dim);font-size:9px;line-height:1.5}
-  .docs-box .dbody .kw{color:var(--accent)}
-  .docs-box .dbody .field{color:var(--cyan)}
-  .docs-box .dbody .rule{color:var(--red)}
+  /* ── docs full page ── */
+  .docs-side{grid-column:1;grid-row:2;overflow-y:auto;border-right:1px solid var(--border)}
+  .docs-side .nav-item{padding:6px 14px;font-size:10px;color:var(--dim);cursor:pointer;border-left:2px solid transparent}
+  .docs-side .nav-item:hover{color:var(--ink);background:rgba(0,255,65,0.02)}
+  .docs-side .nav-item.active{color:var(--accent);border-left-color:var(--accent)}
+  .docs-side .nav-group{font-size:8px;color:var(--muted);letter-spacing:2px;padding:12px 14px 4px;text-transform:uppercase}
+  .docs-body{grid-column:2;grid-row:2;overflow-y:auto;padding:24px 32px}
+  .docs-body h1{color:var(--green);font-size:14px;letter-spacing:2px;font-weight:700;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  .docs-body h2{color:var(--ink);font-size:12px;letter-spacing:1px;font-weight:700;margin:20px 0 8px}
+  .docs-body h3{color:var(--cyan);font-size:10px;letter-spacing:1px;font-weight:600;margin:14px 0 4px}
+  .docs-body p{color:var(--dim);font-size:10px;line-height:1.7;margin-bottom:8px}
+  .docs-body code{background:var(--bg);padding:1px 5px;color:var(--yellow);font-size:9px;border:1px solid var(--border)}
+  .docs-body pre{background:var(--bg);padding:12px;border:1px solid var(--border);margin:8px 0;overflow-x:auto;color:var(--dim);font-size:9px;line-height:1.6}
+  .docs-body .kw{color:var(--accent)}
+  .docs-body .fld{color:var(--cyan)}
+  .docs-body .rul{color:var(--red)}
+  .docs-body ul{color:var(--dim);font-size:10px;line-height:1.7;padding-left:16px;margin-bottom:8px}
+  .docs-body li{margin-bottom:2px}
+  .docs-body .back-btn{font-size:9px;color:var(--dim);border:1px solid var(--border);padding:3px 8px;cursor:pointer;background:transparent;font-family:inherit;letter-spacing:1px;margin-bottom:12px;display:inline-block}
+  .docs-body .back-btn:hover{border-color:var(--accent);color:var(--accent)}
 
   ::-webkit-scrollbar{width:3px}
   ::-webkit-scrollbar-track{background:transparent}
@@ -126,8 +148,9 @@
 </style>
 </head>
 <body>
-<div class="shell">
-  <!-- header -->
+
+<!-- ════ MAIN APP ════ -->
+<div class="shell" id="shell">
   <div class="hdr">
     <div class="dot"></div>
     <span class="brand">pidgin</span>
@@ -139,11 +162,9 @@
     <span class="stat"><b>blk</b> <span id="hBlk">0</span></span>
     <div class="r">
       <span class="live">online</span>
-      <button class="docs-btn" onclick="toggleDocs()">DOCS</button>
+      <button class="nav-btn" onclick="showDocs()">DOCS</button>
     </div>
   </div>
-
-  <!-- sidebar -->
   <div class="side">
     <div class="side-head">pipeline</div>
     <div class="stages" id="stages"></div>
@@ -157,15 +178,15 @@
       <div class="srow"><span class="k">latency</span><span class="v" id="sLat">--</span></div>
     </div>
   </div>
-
-  <!-- comms -->
-  <div class="main">
-    <div class="main-head">encrypted comms</div>
-    <div class="comms" id="comms"></div>
+  <div id="commsPanel">
+    <div class="phead c-p">encrypted comms</div>
+    <div class="comms-scroll" id="comms"></div>
   </div>
-
-  <!-- bottom -->
-  <div class="bottom">
+  <div id="elogPanel">
+    <div class="phead c-e">event log</div>
+    <div class="comms-scroll" id="elog"></div>
+  </div>
+  <div class="bot">
     <div class="input-col">
       <div class="lbl">transmit .pgn</div>
       <textarea id="pktIn" spellcheck="false">@run code.review
@@ -196,74 +217,140 @@ human=yes</textarea>
   </div>
 </div>
 
-<!-- docs overlay -->
-<div class="docs-overlay" id="docsOverlay">
-  <div class="docs-box">
-    <div class="dhdr">
-      <span class="dt">pidgin // documentation</span>
-      <button onclick="toggleDocs()">CLOSE [esc]</button>
+<!-- ════ DOCS FULL PAGE ════ -->
+<div class="docs-page" id="docsPage">
+  <div class="hdr">
+    <div class="dot"></div>
+    <span class="brand">pidgin</span>
+    <span class="ver">v0.2.0</span>
+    <span class="sep">|</span>
+    <span class="stat">documentation</span>
+    <div class="r">
+      <button class="nav-btn active" onclick="showApp()">SIMULATOR</button>
     </div>
-    <div class="dbody">
-      <h2>protocol overview</h2>
-      <p>Pidgin is a safety-gated agent-to-agent communication protocol. Every packet is parsed, validated against schema, checked against safety rules, resolved for references, and expanded into executable YAML before delivery.</p>
+  </div>
+  <div class="docs-side">
+    <div class="nav-group">protocol</div>
+    <div class="nav-item active" onclick="scrollTo('d-overview')">overview</div>
+    <div class="nav-item" onclick="scrollTo('d-format')">packet format</div>
+    <div class="nav-item" onclick="scrollTo('d-directive')">directives</div>
+    <div class="nav-group">pipeline</div>
+    <div class="nav-item" onclick="scrollTo('d-lexer')">01 lexer</div>
+    <div class="nav-item" onclick="scrollTo('d-parser')">02 parser</div>
+    <div class="nav-item" onclick="scrollTo('d-syntax')">03 syntax</div>
+    <div class="nav-item" onclick="scrollTo('d-schema')">04 schema</div>
+    <div class="nav-item" onclick="scrollTo('d-safety')">05 safety</div>
+    <div class="nav-item" onclick="scrollTo('d-resolve')">06 resolve</div>
+    <div class="nav-item" onclick="scrollTo('d-expand')">07 expand</div>
+    <div class="nav-group">safety</div>
+    <div class="nav-item" onclick="scrollTo('d-rules')">rules SG-1..9</div>
+    <div class="nav-group">api</div>
+    <div class="nav-item" onclick="scrollTo('d-api')">endpoints</div>
+    <div class="nav-group">cli</div>
+    <div class="nav-item" onclick="scrollTo('d-cli')">commands</div>
+  </div>
+  <div class="docs-body">
+    <button class="back-btn" onclick="showApp()">&larr; back to simulator</button>
 
-      <h2>packet format</h2>
-      <p>9-line .pgn packets. First line is the directive. Required fields: <code>wf</code>, <code>mode</code>, <code>in</code>, <code>out</code>. Optional: <code>do</code>, <code>deny</code>, <code>risk</code>, <code>human</code>, <code>ttl</code>.</p>
-      <pre>@run &lt;run_id&gt;
-wf=&lt;workflow&gt;
-mode=draft|approval
-in=[&lt;inputs&gt;]
-out=[&lt;outputs&gt;]
-do=[&lt;actions&gt;]
-deny=[&lt;denied_actions&gt;]
-risk=low|med|crit
-human=yes|no</pre>
+    <h1 id="d-overview">protocol overview</h1>
+    <p>Pidgin is a safety-gated agent-to-agent communication protocol. Every packet travels through a 7-stage pipeline: lexing, parsing, syntax validation, schema checks, safety rule evaluation, reference resolution, and YAML expansion.</p>
+    <p>The protocol enforces a <span class="kw">deny-list</span> model: agents declare what they will <span class="fld">do</span> and what they will <span class="fld">deny</span>. Safety rules block dangerous combinations before execution.</p>
+    <p>Packets are 9-line text blocks in <code>.pgn</code> format. The first line is the directive. Fields are key=value pairs, one per line.</p>
 
-      <h2>pipeline stages</h2>
-      <h3>01 LEXER</h3>
-      <p>Tokenizes raw .pgn text. Detects directive type (<code>@run</code>, <code>@log</code>, <code>@resolve</code>, <code>@emit</code>).</p>
-      <h3>02 PARSER</h3>
-      <p>Extracts key-value fields. Parses array syntax <code>[a,b,c]</code>. Generates run_id from directive.</p>
-      <h3>03 SYNTAX</h3>
-      <p>Validates required fields are present. Checks field types and value ranges.</p>
-      <h3>04 SCHEMA</h3>
-      <p>Validates against workflow schema. Checks risk level, human flag, mode permissions.</p>
-      <h3>05 SAFETY</h3>
-      <p>Evaluates 9 safety rules (SG-1 through SG-9). Blocks dangerous combinations. Can require human approval.</p>
-      <h3>06 RESOLVE</h3>
-      <p>Resolves reference aliases. Maps short names to full paths. Checks reference existence.</p>
-      <h3>07 EXPAND</h3>
-      <p>Generates full YAML execution spec. Includes routing, TTL, executor recommendation.</p>
+    <h1 id="d-format">packet format</h1>
+    <pre>@run <span class="fld">&lt;run_id&gt;</span>
+<span class="fld">wf</span>=<span class="kw">&lt;workflow&gt;</span>
+<span class="fld">mode</span>=<span class="kw">draft|approval</span>
+<span class="fld">in</span>=[<span class="fld">&lt;inputs&gt;</span>]
+<span class="fld">out</span>=[<span class="fld">&lt;outputs&gt;</span>]
+<span class="fld">do</span>=[<span class="fld">&lt;allowed_actions&gt;</span>]
+<span class="fld">deny</span>=[<span class="fld">&lt;denied_actions&gt;</span>]
+<span class="fld">risk</span>=<span class="kw">low|med|crit</span>
+<span class="fld">human</span>=<span class="kw">yes|no</span></pre>
 
-      <h2>safety rules</h2>
-      <pre>SG-1  deny contains actions from do
-SG-2  critical risk with human=no
-SG-3  publish/send in do
-SG-4  delete in do
-SG-5  secrets in do or deny
-SG-6  file traversal in inputs
-SG-7  missing human on critical
-SG-8  invalid risk level
-SG-9  approval mode without human</pre>
+    <h3>required fields</h3>
+    <ul>
+      <li><code>wf</code> — workflow identifier (e.g. <code>generic_review</code>, <code>generic_draft_and_distribute</code>)</li>
+      <li><code>mode</code> — <code>draft</code> (auto) or <code>approval</code> (requires human gate)</li>
+      <li><code>in</code> — array of input references (files, data, resources)</li>
+      <li><code>out</code> — array of output references</li>
+    </ul>
+    <h3>optional fields</h3>
+    <ul>
+      <li><code>do</code> — allowed actions array (e.g. <code>[read, draft, review]</code>)</li>
+      <li><code>deny</code> — denied actions array (e.g. <code>[publish, send, delete]</code>)</li>
+      <li><code>risk</code> — risk level: <code>low</code>, <code>med</code>, <code>crit</code></li>
+      <li><code>human</code> — <code>yes</code> (human-in-the-loop) or <code>no</code> (autonomous)</li>
+    </ul>
 
-      <h2>api endpoints</h2>
-      <pre>POST /api/v1/parse     -> parse directive, extract fields
-POST /api/v1/validate  -> check required fields
-POST /api/v1/check     -> safety + resolution in one call
-POST /api/v1/expand    -> generate full YAML
-POST /api/v1/run       -> execute full pipeline
-GET  /api/v1/health    -> server status</pre>
+    <h1 id="d-directive">directives</h1>
+    <ul>
+      <li><code>@run</code> — execute a workflow (most common)</li>
+      <li><code>@log</code> — log an event without execution</li>
+      <li><code>@resolve</code> — resolve reference aliases only</li>
+      <li><code>@emit</code> — emit a signal to another agent</li>
+    </ul>
 
-      <h2>cli commands</h2>
-      <pre>pgn init              create .pidgin/ config
-pgn parse &lt;file&gt;      parse .pgn packet
-pgn validate &lt;file&gt;   validate fields
-pgn check &lt;file&gt;      safety + resolve
-pgn expand &lt;file&gt;     expand to YAML
-pgn run &lt;file&gt;        full pipeline
-pgn serve             start HTTP server
-pgn docs              show protocol docs</pre>
-    </div>
+    <h1>pipeline stages</h1>
+
+    <h2 id="d-lexer">01 — LEXER</h2>
+    <p>Tokenizes raw .pgn text into line-based tokens. Detects the directive type from the first line. Handles whitespace normalization, comment stripping, and encoding detection.</p>
+    <p>Output: token stream with line references.</p>
+
+    <h2 id="d-parser">02 — PARSER</h2>
+    <p>Extracts key-value pairs from tokens. Parses array syntax <code>[a,b,c]</code> into structured lists. Generates a deterministic <code>run_id</code> from the directive if not provided.</p>
+    <p>Output: field map with typed values.</p>
+
+    <h2 id="d-syntax">03 — SYNTAX</h2>
+    <p>Validates required fields are present. Checks field types (string vs array vs enum). Verifies value ranges (risk must be low/med/crit, mode must be draft/approval).</p>
+    <p>Output: validation result (pass/fail + error list).</p>
+
+    <h2 id="d-schema">04 — SCHEMA</h2>
+    <p>Validates against workflow schema. Checks that the workflow identifier exists. Verifies that the requested actions are compatible with the risk level and human flag.</p>
+    <p>Output: schema compliance result.</p>
+
+    <h2 id="d-safety">05 — SAFETY</h2>
+    <p>Evaluates 9 safety rules (SG-1 through SG-9). Rules check for dangerous combinations: actions that conflict, missing human gates on critical operations, path traversal attempts, and more.</p>
+    <p>Output: safety verdict (pass/block) + list of fired rules + human_required flag.</p>
+
+    <h2 id="d-resolve">06 — RESOLVE</h2>
+    <p>Resolves reference aliases to concrete paths. Maps short names to full filesystem or network paths. Checks reference existence and accessibility.</p>
+    <p>Output: resolution map (original → resolved path + status).</p>
+
+    <h2 id="d-expand">07 — EXPAND</h2>
+    <p>Generates full YAML execution specification. Includes routing information, TTL, executor recommendation, and all resolved references. This is the final output delivered to the receiving agent.</p>
+    <p>Output: complete YAML document.</p>
+
+    <h1 id="d-rules">safety rules</h1>
+    <pre><span class="rul">SG-1</span>  deny contains actions from do (conflict)
+<span class="rul">SG-2</span>  critical risk with human=no (autonomous crit)
+<span class="rul">SG-3</span>  publish or send in do (external distribution)
+<span class="rul">SG-4</span>  delete in do (destructive action)
+<span class="rul">SG-5</span>  secrets in do or deny (sensitive data)
+<span class="rul">SG-6</span>  file traversal in inputs (path escape)
+<span class="rul">SG-7</span>  missing human on critical (approval required)
+<span class="rul">SG-8</span>  invalid risk level (schema violation)
+<span class="rul">SG-9</span>  approval mode without human=yes (gate mismatch)</pre>
+    <p>Rules fire independently. A packet can trigger multiple rules. Fired rules are logged and included in the safety output. Blocked packets never reach the expand stage.</p>
+
+    <h1 id="d-api">api endpoints</h1>
+    <pre>POST /api/v1/parse      parse directive, extract fields
+POST /api/v1/validate   check required fields
+POST /api/v1/check      safety + resolution combined
+POST /api/v1/expand     generate full YAML
+POST /api/v1/run        execute full pipeline
+GET  /api/v1/health     server status + host info</pre>
+    <p>All POST endpoints accept <code>text/plain</code> body (raw .pgn text). Responses are JSON with <code>ok</code> boolean + <code>data</code> or <code>error</code>.</p>
+
+    <h1 id="d-cli">cli commands</h1>
+    <pre>pgn init                create .pidgin/ config directory
+pgn parse &lt;file&gt;        parse .pgn packet
+pgn validate &lt;file&gt;     validate required fields
+pgn check &lt;file&gt;        safety rules + reference resolution
+pgn expand &lt;file&gt;       expand to full YAML
+pgn run &lt;file&gt;          execute complete pipeline
+pgn serve               start HTTP server (default :3847)
+pgn docs                display protocol documentation</pre>
   </div>
 </div>
 
@@ -283,9 +370,13 @@ function ts(){const n=new Date();return[n.getHours(),n.getMinutes(),n.getSeconds
 function hx(s){return[...s].map(c=>c.charCodeAt(0).toString(16).padStart(2,'0')).join(' ')}
 
 setInterval(()=>{const s=Math.floor((Date.now()-t0)/1000),m=Math.floor(s/60),h=Math.floor(m/60);$('hUp').textContent=h?`${h}h${m%60}m`:m?`${m}m${s%60}s`:`${s}s`},1000);
-
 async function health(){try{const r=await fetch('/api/v1/health');const d=await r.json();$('hHost').textContent=d.data.host.split('\\').pop()}catch{$('hHost').textContent='--'}}
 health();
+
+// nav
+function showDocs(){$('shell').classList.add('hidden');$('docsPage').classList.add('open')}
+function showApp(){$('docsPage').classList.remove('open');$('shell').classList.remove('hidden')}
+function scrollTo(id){const el=document.getElementById(id);if(el)el.scrollIntoView({behavior:'smooth',block:'start'});document.querySelectorAll('.docs-side .nav-item').forEach(n=>n.classList.remove('active'));event.target.classList.add('active')}
 
 // pipeline
 const ST=['LEXER','PARSER','SYNTAX','SCHEMA','SAFETY','RESOLVE','EXPAND'];
@@ -296,7 +387,11 @@ function setS(i,st,inf){const e=$('s'+i);e.className='stg '+st;e.querySelector('
 // comms
 function msg(tag,cls,body){const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="t">${ts()}</span><span class="tag ${cls}">${tag}</span><span class="b">${body}</span>`;$('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight}
 function msgHex(tag,cls,hex,plain){const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="t">${ts()}</span><span class="tag ${cls}">${tag}</span><span class="b"><span class="hex">${hex}</span> <span class="w">&rarr;</span> <span class="c">${plain}</span></span>`;$('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight}
-function msgDiv(text){const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="t"></span><span class="tag" style="visibility:hidden">_</span><span class="divider">${'---'.repeat(20)} ${text} ${'---'.repeat(20)}</span>`;$('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight}
+function msgDiv(text){const d=document.createElement('div');d.className='msg';d.innerHTML=`<span class="t"></span><span class="tag" style="visibility:hidden">_</span><span class="divider">${'---'.repeat(16)} ${text} ${'---'.repeat(16)}</span>`;$('comms').appendChild(d);$('comms').scrollTop=$('comms').scrollHeight}
+
+// event log
+function elog(lvl,src,msg){const d=document.createElement('div');d.className='elog-entry';d.innerHTML=`<span class="et">${ts()}</span><span class="elvl ${lvl}">${lvl}</span><span class="emsg"><span class="w">[${src}]</span> ${msg}</span>`;$('elog').appendChild(d);$('elog').scrollTop=$('elog').scrollHeight}
+function elogDiv(text){const d=document.createElement('div');d.className='elog-entry';d.innerHTML=`<span class="et"></span><span class="elvl"></span><span class="emsg" style="color:var(--muted);letter-spacing:2px;opacity:.4">${'─'.repeat(20)} ${text} ${'─'.repeat(20)}</span>`;$('elog').appendChild(d);$('elog').scrollTop=$('elog').scrollHeight}
 
 function upStats(){$('sPkts').textContent=pkts;$('sPass').textContent=passed;$('sBlk').textContent=blk;$('sRules').textContent=rules;$('sRes').textContent=res;$('sResF').textContent=resF;$('hPkts').textContent=pkts;$('hBlk').textContent=blk}
 
@@ -306,52 +401,78 @@ async function sim(){
   if(busy)return;busy=true;
   const pgn=$('pktIn').value;pkts++;upStats();
   const t=performance.now();
-  msgDiv('SESSION');
-  msg('NET','net',`<span class="g">0x${Math.random().toString(16).slice(2,10)}</span> packet incoming`);
+  const sid=Math.random().toString(16).slice(2,10);
+
+  msgDiv('SESSION '+sid);
+  elogDiv('SESSION '+sid);
+
+  msg('NET','net',`<span class="g">0x${sid}</span> packet incoming <span class="y">${pgn.length}B</span>`);
+  elog('info','NET',`connection established from 0x${sid}`);
+  elog('debug','NET',`packet size: ${pgn.length} bytes, encoding: utf-8`);
+
   msgHex('AGENT','ag',hx(pgn.split('\n')[0]),pgn.split('\n')[0]);
+  elog('info','AGENT',`directive parsed: ${pgn.split('\n')[0]}`);
   await delay(60);
 
-  for(let i=0;i<7;i++){setS(i,'run','...');await delay(60+Math.random()*80)}
+  for(let i=0;i<7;i++){setS(i,'run','...');elog('debug','PIPE',`stage ${i+1}/7 ${ST[i]} starting`);await delay(40+Math.random()*60)}
 
   const pr=await api('parse',pgn);
-  if(pr.ok){setS(0,'pass',`dir=${pr.data.directive}`);setS(1,'pass',`id=${pr.data.run_id.slice(0,12)}`);msg('SRV','srv',`<span class="g">PARSE_OK</span> directive=<span class="c">${pr.data.directive}</span> run_id=<span class="p">${pr.data.run_id}</span>`)}
-  else{setS(0,'fail','err');setS(1,'fail','err');msg('ERR','err',`<span class="r">PARSE_FAIL</span> ${pr.error}`);blk++;upStats();busy=false;return}
+  if(pr.ok){
+    setS(0,'pass',`dir=${pr.data.directive}`);setS(1,'pass',`id=${pr.data.run_id.slice(0,12)}`);
+    msg('SRV','srv',`<span class="g">PARSE_OK</span> directive=<span class="c">${pr.data.directive}</span> run_id=<span class="p">${pr.data.run_id}</span>`);
+    elog('ok','LEXER',`tokenized ${pr.data.field_count} tokens`);
+    elog('ok','PARSER',`directive=${pr.data.directive}, run_id=${pr.data.run_id}`);
+  }else{setS(0,'fail','err');setS(1,'fail','err');msg('ERR','err',`<span class="r">PARSE_FAIL</span> ${pr.error}`);elog('err','LEXER',pr.error);blk++;upStats();busy=false;return}
   await delay(40);
 
   const vr=await api('validate',pgn);
-  if(vr.ok&&vr.data.length===0){setS(2,'pass','ok');msg('SRV','srv',`<span class="g">VALIDATE_OK</span> all fields present`)}
-  else{setS(2,'fail',`${vr.data.length} err`);msg('SRV','srv',`<span class="r">VALIDATE_FAIL</span> ${vr.data.length} errors`);vr.data.forEach(e=>msg('SRV','srv',`  <span class="r">${e.code}</span> ${e.message}`));blk++;upStats();busy=false;return}
+  if(vr.ok&&vr.data.length===0){setS(2,'pass','ok');msg('SRV','srv',`<span class="g">VALIDATE_OK</span> all fields present`);elog('ok','SYNTAX',`required fields: wf, mode, in, out — all present`)}
+  else{setS(2,'fail',`${vr.data.length} err`);msg('SRV','srv',`<span class="r">VALIDATE_FAIL</span> ${vr.data.length} errors`);vr.data.forEach(e=>{msg('SRV','srv',`  <span class="r">${e.code}</span> ${e.message}`);elog('err','SYNTAX',`${e.code}: ${e.message}`)});blk++;upStats();busy=false;return}
   await delay(40);
 
-  setS(3,'pass','ok');msg('SRV','srv',`<span class="g">SCHEMA_OK</span> wf=<span class="y">${(pgn.match(/risk=(\w+)/)||[])[1]||'?'}</span> risk=<span class="y">${(pgn.match(/risk=(\w+)/)||[])[1]||'?'}</span>`);
+  const wf=(pgn.match(/wf=(\w+)/)||[])[1]||'?';
+  const rk=(pgn.match(/risk=(\w+)/)||[])[1]||'?';
+  const hm=(pgn.match(/human=(\w+)/)||[])[1]||'?';
+  setS(3,'pass','ok');
+  msg('SRV','srv',`<span class="g">SCHEMA_OK</span> wf=<span class="y">${wf}</span> risk=<span class="y">${rk}</span> human=<span class="c">${hm}</span>`);
+  elog('ok','SCHEMA',`workflow=${wf}, risk=${rk}, human=${hm}`);
   await delay(40);
 
   const cr=await api('check',pgn);
   if(cr.ok){
     const s=cr.data.safety,r=cr.data.resolution;
-    if(s.blocked){setS(4,'fail','BLOCKED');msg('SRV','srv',`<span class="r">SAFETY_BLOCK</span> ${s.fired_rules.map(x=>`<span class="y">${x}</span>`).join(', ')}`);blk++;rules+=s.fired_rules.length}
-    else{setS(4,'pass',`${s.fired_rules.length} rules`);msg('SRV','srv',`<span class="g">SAFETY_PASS</span> ${s.fired_rules.length} evaluated`);rules+=s.fired_rules.length}
-    if(s.human_required)msg('SRV','srv',`<span class="y">HUMAN_REQUIRED</span> approval gate active`);
+    if(s.blocked){setS(4,'fail','BLOCKED');msg('SRV','srv',`<span class="r">SAFETY_BLOCK</span> ${s.fired_rules.map(x=>`<span class="y">${x}</span>`).join(', ')}`);elog('err','SAFETY',`BLOCKED — rules fired: ${s.fired_rules.join(', ')}`);blk++;rules+=s.fired_rules.length}
+    else{setS(4,'pass',`${s.fired_rules.length} rules`);msg('SRV','srv',`<span class="g">SAFETY_PASS</span> ${s.fired_rules.length} evaluated`);elog('ok','SAFETY',`${s.fired_rules.length} rules evaluated, no blocks`);rules+=s.fired_rules.length}
+    if(s.human_required){msg('SRV','srv',`<span class="y">HUMAN_REQUIRED</span> approval gate active`);elog('warn','SAFETY',`human approval gate required`)}
+
     const ok=r.filter(x=>x.status==='RESOLVED'),bad=r.filter(x=>x.status!=='RESOLVED');
     res+=ok.length;resF+=bad.length;setS(5,bad.length?'fail':'pass',`${ok.length}r/${bad.length}u`);
-    if(ok.length)msg('SRV','srv',`<span class="g">RESOLVED</span> ${ok.map(x=>`<span class="c">${x.original}</span>`).join(', ')}`);
-    bad.forEach(x=>msg('SRV','srv',`<span class="r">UNRESOLVED</span> <span class="c">${x.original}</span> status=${x.status}`));
-  }else{setS(4,'fail','err');setS(5,'fail','err');msg('ERR','err',`<span class="r">CHECK_FAIL</span> ${cr.error}`);blk++;upStats();busy=false;return}
+    if(ok.length){msg('SRV','srv',`<span class="g">RESOLVED</span> ${ok.map(x=>`<span class="c">${x.original}</span>`).join(', ')}`);elog('ok','RESOLVE',`resolved ${ok.length} references`)}
+    bad.forEach(x=>{msg('SRV','srv',`<span class="r">UNRESOLVED</span> <span class="c">${x.original}</span> status=${x.status}`);elog('warn','RESOLVE',`${x.original} — ${x.status}`)});
+  }else{setS(4,'fail','err');setS(5,'fail','err');msg('ERR','err',`<span class="r">CHECK_FAIL</span> ${cr.error}`);elog('err','SAFETY',cr.error);blk++;upStats();busy=false;return}
   await delay(40);
 
   const er=await api('expand',pgn);
-  if(er.ok){setS(6,'pass','done');$('rawP').textContent=pgn;$('expP').textContent=er.data.yaml;msg('SRV','srv',`<span class="g">EXPAND_OK</span> route=<span class="c">${er.data.route.match(/executor: (\w+)/)?.[1]||'?'}</span> ttl=24h`);msgHex('SRV','srv',hx(er.data.route.slice(0,30)),er.data.route.slice(0,50)+'...');passed++}
-  else{setS(6,'fail','err');msg('ERR','err',`<span class="r">EXPAND_FAIL</span> ${er.error}`);blk++}
+  if(er.ok){
+    setS(6,'pass','done');$('rawP').textContent=pgn;$('expP').textContent=er.data.yaml;
+    msg('SRV','srv',`<span class="g">EXPAND_OK</span> route=<span class="c">${er.data.route.match(/executor: (\w+)/)?.[1]||'?'}</span> ttl=24h`);
+    msgHex('SRV','srv',hx(er.data.route.slice(0,30)),er.data.route.slice(0,50)+'...');
+    elog('ok','EXPAND',`YAML generated, ${er.data.yaml.length} bytes`);
+    elog('info','ROUTE',er.data.route);
+    passed++;
+  }else{setS(6,'fail','err');msg('ERR','err',`<span class="r">EXPAND_FAIL</span> ${er.error}`);elog('err','EXPAND',er.error);blk++}
 
-  $('sLat').textContent=(performance.now()-t).toFixed(0)+'ms';
-  msgDiv('END');upStats();busy=false
+  const lat=(performance.now()-t).toFixed(0);
+  $('sLat').textContent=lat+'ms';
+  elog('info','SYS',`pipeline complete in ${lat}ms`);
+  msgDiv('END '+sid);
+  elogDiv('END '+sid);
+  upStats();busy=false
 }
 
-function reset(){busy=false;initStages();$('comms').innerHTML='';$('rawP').textContent='--';$('expP').textContent='--';pkts=passed=blk=rules=res=resF=0;upStats();$('sLat').textContent='--';msg('SYS','sys','session cleared')}
+function reset(){busy=false;initStages();$('comms').innerHTML='';$('elog').innerHTML='';$('rawP').textContent='--';$('expP').textContent='--';pkts=passed=blk=rules=res=resF=0;upStats();$('sLat').textContent='--';msg('SYS','sys','session cleared');elog('info','SYS','session cleared')}
 
-function toggleDocs(){$('docsOverlay').classList.toggle('open')}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')$('docsOverlay').classList.remove('open')});
-
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('docsPage').classList.contains('open'))showApp()});
 function delay(ms){return new Promise(r=>setTimeout(r,ms))}
 </script>
 </body>
