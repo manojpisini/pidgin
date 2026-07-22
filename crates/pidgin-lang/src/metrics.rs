@@ -41,29 +41,3 @@ pub fn measure_packet(packet: &PgnPacket) -> TokenReport {
         field_count,
     }
 }
-
-#[derive(Debug, Serialize)]
-pub struct TokenSavingsReport {
-    pub pgn_tokens: usize,
-    pub verbose_tokens: usize,
-    pub savings_ratio: f32,
-    pub savings_pct_display: String,
-}
-
-pub fn compare_verbose(pgn_text: &str, verbose_text: &str) -> TokenSavingsReport {
-    let pgn_tokens = estimate_tokens(pgn_text);
-    let verbose_tokens = estimate_tokens(verbose_text);
-    let savings_ratio = if verbose_tokens > 0 {
-        1.0 - (pgn_tokens as f32 / verbose_tokens as f32)
-    } else {
-        0.0
-    };
-    let savings_pct = (savings_ratio * 100.0).round() as i32;
-
-    TokenSavingsReport {
-        pgn_tokens,
-        verbose_tokens,
-        savings_ratio,
-        savings_pct_display: format!("{}%", savings_pct),
-    }
-}

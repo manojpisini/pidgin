@@ -12,7 +12,7 @@ mod expander_tests {
 
     fn test_workflows() -> WorkflowRegistry {
         let path =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/WORKFLOW_REGISTRY.yaml");
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.pidgin/WORKFLOW_REGISTRY.yaml");
         load_workflow_registry(&path).unwrap()
     }
 

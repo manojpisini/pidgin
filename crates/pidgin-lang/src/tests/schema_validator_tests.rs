@@ -1,13 +1,14 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod schema_validator_tests {
-    use std::path::Path;
     use crate::parser::parse_packet;
     use crate::registry::load_workflow_registry;
     use crate::validator::schema::validate_schema;
+    use std::path::Path;
 
     fn load_workflows() -> crate::registry::WorkflowRegistry {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/WORKFLOW_REGISTRY.yaml");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.pidgin/WORKFLOW_REGISTRY.yaml");
         load_workflow_registry(&path).unwrap()
     }
 
@@ -42,7 +43,8 @@ mod schema_validator_tests {
     #[test]
     fn invalid_risk_level() {
         let workflows = load_workflows();
-        let input = "@run test.badrisk\nwf=generic_review\nmode=draft\nin=[a]\nout=[b]\nrisk=extreme";
+        let input =
+            "@run test.badrisk\nwf=generic_review\nmode=draft\nin=[a]\nout=[b]\nrisk=extreme";
         let packet = parse_packet(input).unwrap();
         let errors = validate_schema(&packet, &workflows);
         assert!(errors.iter().any(|e| e.code == "PGN_E004"));

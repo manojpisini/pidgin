@@ -1,0 +1,6 @@
+Metadata-Version: 2.4
+Name: pidgin-runtime
+Version: 0.1.0
+Summary: Python SDK for Pidgin — A compact agent handoff protocol runtime
+Requires-Python: >=3.11
+Requires-Dist: pydantic>=2.6

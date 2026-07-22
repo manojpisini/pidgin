@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::ast::{FieldValue, PgnPacket};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum ResolutionStatus {
     Resolved,
     Missing,
@@ -13,12 +13,12 @@ pub enum ResolutionStatus {
     Forbidden,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ResolvedRef {
     pub original: String,
     pub namespace: String,
     pub ref_id: String,
-    pub resolved_path: Option<PathBuf>,
+    pub resolved_path: Option<std::path::PathBuf>,
     pub confidence: f32,
     pub required: bool,
     pub status: ResolutionStatus,

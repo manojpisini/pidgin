@@ -2,7 +2,7 @@ use crate::ast::{FieldValue, PgnPacket};
 use crate::registry::{ActionRegistry, SafetyRules, WorkflowRegistry};
 use crate::resolver::ResolvedRef;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum SafetyRuleId {
     Sg1,
     Sg2,
@@ -31,7 +31,7 @@ impl std::fmt::Display for SafetyRuleId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct SafetyResult {
     pub allowed: bool,
     pub blocked: bool,

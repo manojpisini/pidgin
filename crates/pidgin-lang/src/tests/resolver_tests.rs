@@ -6,7 +6,7 @@ mod resolver_tests {
     use crate::ast::{Directive, FieldValue, PgnPacket};
     use crate::resolver::{
         expand_alias, load_aliases, parse_ref, resolve_all, resolve_ref, ReferenceAliases,
-        ResolverContext, ResolutionStatus,
+        ResolutionStatus, ResolverContext,
     };
 
     fn empty_aliases() -> ReferenceAliases {
@@ -89,7 +89,7 @@ mod resolver_tests {
     #[test]
     fn folder_ref_exists_resolved() {
         let ctx = make_ctx(empty_aliases());
-        let result = resolve_ref("folder:configs", &ctx);
+        let result = resolve_ref("folder:.pidgin", &ctx);
         assert_eq!(result.status, ResolutionStatus::Resolved);
         assert!((result.confidence - 1.0).abs() < f32::EPSILON);
     }
@@ -173,7 +173,8 @@ mod resolver_tests {
 
     #[test]
     fn load_aliases_from_config() {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs/REFERENCE_ALIASES.yaml");
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.pidgin/REFERENCE_ALIASES.yaml");
         let aliases = load_aliases(&path).unwrap();
         assert!(aliases.aliases.is_empty());
         assert!(aliases.common.is_empty());
@@ -211,9 +212,9 @@ mod resolver_tests {
     #[test]
     fn file_ref_dotdot_within_root_still_works() {
         let ctx = make_ctx(empty_aliases());
-        // configs/../Cargo.toml stays within workspace root because
-        // ParentDir cancels with configs/, leaving Cargo.toml at root
-        let result = resolve_ref("file:configs/../Cargo.toml", &ctx);
+        // .pidgin/../Cargo.toml stays within workspace root because
+        // ParentDir cancels with .pidgin/, leaving Cargo.toml at root
+        let result = resolve_ref("file:.pidgin/../Cargo.toml", &ctx);
         assert_eq!(result.status, ResolutionStatus::Resolved);
     }
 
@@ -230,11 +231,11 @@ mod resolver_tests {
 
     #[test]
     fn file_ref_traversal_escape_then_return_forbidden() {
-        // configs/../../target goes up to parent of root, then back to target/
+        // .pidgin/../../target goes up to parent of root, then back to target/
         // under root — but the intermediate escape is still flagged as forbidden
         // (strict but safe)
         let ctx = make_ctx(empty_aliases());
-        let result = resolve_ref("file:configs/../../target", &ctx);
+        let result = resolve_ref("file:.pidgin/../../target", &ctx);
         assert_eq!(result.status, ResolutionStatus::Forbidden);
     }
 
@@ -250,12 +251,12 @@ mod resolver_tests {
 
     #[test]
     fn file_ref_stays_in_host_root_breadth_first() {
-        // Navigate to a sibling that is within root: configs/SAFETY_RULES.yaml
+        // Navigate to a sibling that is within root: .pidgin/SAFETY_RULES.yaml
         let ctx = make_ctx(empty_aliases());
-        let result = resolve_ref("file:configs/SAFETY_RULES.yaml", &ctx);
-        // configs/ is directly under workspace root, so this is within root
-        let expected = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../configs/SAFETY_RULES.yaml");
+        let result = resolve_ref("file:.pidgin/SAFETY_RULES.yaml", &ctx);
+        // .pidgin/ is directly under workspace root, so this is within root
+        let expected =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.pidgin/SAFETY_RULES.yaml");
         if expected.exists() {
             assert_eq!(result.status, ResolutionStatus::Resolved);
         } else {

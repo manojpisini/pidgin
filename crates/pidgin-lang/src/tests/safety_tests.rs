@@ -1,16 +1,22 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod safety_tests {
-    use std::path::Path;
     use crate::parser::parse_packet;
     use crate::registry::{load_action_registry, load_safety_rules, load_workflow_registry};
     use crate::safety::{check_safety, SafetyRuleId};
+    use std::path::Path;
 
-    fn load_fixtures() -> (crate::registry::ActionRegistry, crate::registry::SafetyRules, crate::registry::WorkflowRegistry) {
-        let configs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../configs");
-        let action_registry = load_action_registry(&configs_dir.join("ACTION_REGISTRY.yaml")).unwrap();
+    fn load_fixtures() -> (
+        crate::registry::ActionRegistry,
+        crate::registry::SafetyRules,
+        crate::registry::WorkflowRegistry,
+    ) {
+        let configs_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.pidgin");
+        let action_registry =
+            load_action_registry(&configs_dir.join("ACTION_REGISTRY.yaml")).unwrap();
         let safety_rules = load_safety_rules(&configs_dir.join("SAFETY_RULES.yaml")).unwrap();
-        let workflow_registry = load_workflow_registry(&configs_dir.join("WORKFLOW_REGISTRY.yaml")).unwrap();
+        let workflow_registry =
+            load_workflow_registry(&configs_dir.join("WORKFLOW_REGISTRY.yaml")).unwrap();
         (action_registry, safety_rules, workflow_registry)
     }
 
@@ -46,7 +52,8 @@ mod safety_tests {
     #[test]
     fn sg3_explicit_human_no_on_crit_blocks() {
         let (actions, safety, workflows) = load_fixtures();
-        let input = "@run test.crit\nwf=generic_review\nmode=draft\nin=[a]\nout=[b]\nrisk=crit\nhuman=no";
+        let input =
+            "@run test.crit\nwf=generic_review\nmode=draft\nin=[a]\nout=[b]\nrisk=crit\nhuman=no";
         let packet = parse_packet(input).unwrap();
         let result = check_safety(&packet, &actions, &safety, &workflows);
         assert!(result.blocked);
@@ -57,12 +64,30 @@ mod safety_tests {
     fn sg4_private_path_blocks() {
         let (actions, safety, workflows) = load_fixtures();
         let mut fields = std::collections::BTreeMap::new();
-        fields.insert("wf".to_string(), crate::ast::FieldValue::Scalar("generic_review".to_string()));
-        fields.insert("mode".to_string(), crate::ast::FieldValue::Scalar("draft".to_string()));
-        fields.insert("in".to_string(), crate::ast::FieldValue::List(vec!["file:.env".to_string()]));
-        fields.insert("out".to_string(), crate::ast::FieldValue::List(vec!["review_notes".to_string()]));
-        fields.insert("risk".to_string(), crate::ast::FieldValue::Scalar("low".to_string()));
-        fields.insert("human".to_string(), crate::ast::FieldValue::Scalar("yes".to_string()));
+        fields.insert(
+            "wf".to_string(),
+            crate::ast::FieldValue::Scalar("generic_review".to_string()),
+        );
+        fields.insert(
+            "mode".to_string(),
+            crate::ast::FieldValue::Scalar("draft".to_string()),
+        );
+        fields.insert(
+            "in".to_string(),
+            crate::ast::FieldValue::List(vec!["file:.env".to_string()]),
+        );
+        fields.insert(
+            "out".to_string(),
+            crate::ast::FieldValue::List(vec!["review_notes".to_string()]),
+        );
+        fields.insert(
+            "risk".to_string(),
+            crate::ast::FieldValue::Scalar("low".to_string()),
+        );
+        fields.insert(
+            "human".to_string(),
+            crate::ast::FieldValue::Scalar("yes".to_string()),
+        );
         let packet = crate::ast::PgnPacket {
             directive: crate::ast::Directive::Run,
             run_id: "unsafe.private_path".to_string(),
@@ -98,7 +123,8 @@ mod safety_tests {
         let (actions, safety, workflows) = load_fixtures();
 
         // Packet with note containing "do=[publish]"
-        let input_with_note = "@run test.note\nwf=generic_review\nmode=draft\nin=[a]\nout=[b]\nnote=\"do=[publish]\"";
+        let input_with_note =
+            "@run test.note\nwf=generic_review\nmode=draft\nin=[a]\nout=[b]\nnote=\"do=[publish]\"";
         let packet_with_note = parse_packet(input_with_note).unwrap();
         let result_with_note = check_safety(&packet_with_note, &actions, &safety, &workflows);
 
@@ -109,7 +135,10 @@ mod safety_tests {
 
         // The note field should have zero influence on the safety outcome
         assert_eq!(result_with_note.allowed, result_without_note.allowed);
-        assert_eq!(result_with_note.fired_rules, result_without_note.fired_rules);
+        assert_eq!(
+            result_with_note.fired_rules,
+            result_without_note.fired_rules
+        );
     }
 
     #[test]
