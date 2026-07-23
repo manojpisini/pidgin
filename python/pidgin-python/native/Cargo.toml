@@ -10,7 +10,7 @@ description = "Native Python bindings bundled with pidgin-python"
 crate-type = ["cdylib"]
 
 [dependencies]
-pidgin-lang = { path = "../../../crates/pidgin-lang", version = "0.1.11" }
+pidgin-lang = { path = "../../../crates/pidgin-lang", version = "0.1.12" }
 pyo3 = { version = "0.23", features = ["extension-module"] }
 serde_json = "1"
 serde_yaml = "=0.9.34"
