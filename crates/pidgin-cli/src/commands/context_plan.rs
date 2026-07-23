@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use pidgin_lang::context::build_context_plan;
 use pidgin_lang::parser::parse_packet;
-use pidgin_lang::resolver::{resolve_all, ResolverContext};
+use pidgin_lang::resolver::{ResolverContext, resolve_all};
 
 use super::{canonicalize_host, get_required_inputs, load_pipeline_configs};
 

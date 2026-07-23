@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pidgin-langgraph"
+version = "0.1.0"
+description = "LangGraph integration for the Pidgin agent handoff protocol (PGN)"
+requires-python = ">=3.11"
+dependencies = [
+    "pidgin-pydantic>=0.1",
+    "langgraph>=0.4",
+    "langchain-core>=0.3",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pidgin_langgraph*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

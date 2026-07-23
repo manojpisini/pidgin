@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use pidgin_lang::expander::expand_to_run_packet;
-use pidgin_lang::logging::{log_event, LogEvent};
+use pidgin_lang::logging::{LogEvent, log_event};
 use pidgin_lang::parser::parse_packet;
 use pidgin_lang::router::{explain_route, route};
 use pidgin_lang::safety::check_safety;

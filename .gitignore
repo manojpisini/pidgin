@@ -1,5 +1,9 @@
 /target
+**/target/
 **/*.rs.bk
 Cargo.lock
 .pidgin/
 pidgin-implementation-plan.md
+.audit/
+**/__pycache__/
+**/*.egg-info/

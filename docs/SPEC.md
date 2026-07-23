@@ -229,4 +229,4 @@ LangGraph / CrewAI / Custom orchestrator
     Orchestrator reads result
 ```
 
-The Python SDK (scaffolded in `python/`) wraps the binary via subprocess or PyO3, giving orchestrators typed Pydantic objects instead of CLI output. LangGraph nodes, CrewAI tools, A2A Tasks, and MCP servers can all consume Pidgin the same way — as a library call or a shell-out to `pgn`.
+The Python runtime (in `python/pidgin-python/`) wraps the binary via subprocess or the bundled native source, giving orchestrators typed objects instead of CLI output. Framework adapters live under `python/adapters/` and must delegate protocol behavior back to core/runtime.

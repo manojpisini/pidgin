@@ -8,9 +8,11 @@ use crate::ast::{Directive, FieldValue};
 const MAX_FIELD_LENGTH: usize = 10_000;
 
 pub fn ident(input: &mut &str) -> ModalResult<String> {
-    take_while(1..=MAX_FIELD_LENGTH, |c: char| c.is_ascii_alphanumeric() || c == '_')
-        .map(|s: &str| s.to_string())
-        .parse_next(input)
+    take_while(1..=MAX_FIELD_LENGTH, |c: char| {
+        c.is_ascii_alphanumeric() || c == '_'
+    })
+    .map(|s: &str| s.to_string())
+    .parse_next(input)
 }
 
 pub fn bare_word(input: &mut &str) -> ModalResult<String> {
@@ -22,7 +24,11 @@ pub fn bare_word(input: &mut &str) -> ModalResult<String> {
 }
 
 pub fn quoted_string(input: &mut &str) -> ModalResult<String> {
-    ('"', take_till(0..=MAX_FIELD_LENGTH, |c: char| c == '"'), '"')
+    (
+        '"',
+        take_till(0..=MAX_FIELD_LENGTH, |c: char| c == '"'),
+        '"',
+    )
         .map(|(_lq, s, _rq): (_, &str, _)| s.to_string())
         .parse_next(input)
 }
@@ -77,7 +83,11 @@ pub fn header_line(input: &mut &str) -> ModalResult<(Directive, String)> {
         "result" => Directive::Result,
         "approval" => Directive::Approval,
         "context" => Directive::Context,
-        _ => return Err(winnow::error::ErrMode::Backtrack(winnow::error::ContextError::new())),
+        _ => {
+            return Err(winnow::error::ErrMode::Backtrack(
+                winnow::error::ContextError::new(),
+            ));
+        }
     };
 
     multispace0.parse_next(input)?;

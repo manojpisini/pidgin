@@ -1,8 +1,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod parser_tests {
-    use crate::parser::parse_packet;
     use crate::ast::{Directive, FieldValue};
+    use crate::parser::parse_packet;
 
     const EXAMPLE_PACKET: &str = include_str!("../../../../examples/basic/generic_task.pgn");
 
@@ -29,9 +29,7 @@ mod parser_tests {
         );
         assert_eq!(
             packet.fields.get("out"),
-            Some(&FieldValue::List(vec![
-                "review_notes".to_string(),
-            ]))
+            Some(&FieldValue::List(vec!["review_notes".to_string(),]))
         );
         assert_eq!(
             packet.fields.get("do"),
@@ -110,6 +108,9 @@ mod parser_tests {
         println!("Result: {:?}", result);
         println!("Remaining input: {:?}", input);
         let result = result.unwrap();
-        assert_eq!(result, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert_eq!(
+            result,
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
     }
 }

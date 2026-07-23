@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum Directive {
     Run,
     Result,
@@ -19,13 +19,13 @@ impl Directive {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub enum FieldValue {
     Scalar(String),
     List(Vec<String>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PgnPacket {
     pub directive: Directive,
     pub run_id: String,

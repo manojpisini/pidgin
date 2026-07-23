@@ -4,7 +4,7 @@ use winnow::Parser;
 
 use crate::ast::PgnPacket;
 use crate::errors::ParseError;
-use crate::lexer::{header_line, field_line};
+use crate::lexer::{field_line, header_line};
 
 const MAX_PACKET_BYTES: usize = 1_000_000;
 const MAX_FIELDS: usize = 100;

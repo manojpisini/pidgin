@@ -16,6 +16,7 @@ Lex and parse a `.pgn` packet file, printing the typed AST to stdout.
 
 ```
 pgn parse examples/basic/generic_task.pgn
+pgn parse examples/basic/generic_task.pgn --json
 ```
 
 Output shows each token and the structured `PgnPacket` with all fields, including the header (directive + run_id) and each typed field.
@@ -81,16 +82,6 @@ pgn measure examples/basic/generic_task.pgn
 ```
 
 Prints a breakdown: header tokens, field tokens, list tokens, reference tokens, total. Uses a simple estimation model (blanket tokens = 0.25 * packet_content_length, packet tokens = length / 4).
-
-## `pgn compare <path>`
-
-Compare Pidgin token cost vs equivalent verbose description.
-
-```
-pgn compare examples/basic/generic_task.pgn
-```
-
-If the packet has a `note` field, that note is used as the verbose baseline. Otherwise, a verbose description is generated. Shows % savings.
 
 ## `pgn context-plan <path>`
 

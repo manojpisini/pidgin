@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use pidgin_lang::parser::parse_packet;
-use pidgin_lang::resolver::{resolve_all, ResolutionStatus, ResolverContext};
+use pidgin_lang::resolver::{ResolutionStatus, ResolverContext, resolve_all};
 
 use super::{canonicalize_host, get_required_inputs, load_pipeline_configs};
 

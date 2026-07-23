@@ -86,7 +86,7 @@ Pidgin is not an agent framework. It is the narrow waist between whatever produc
 | `expand` | Produce fully-specified executable YAML packet |
 | `run` | Full pipeline — parse → validate → safety → resolve → expand |
 | `measure` | Estimate token cost of a packet |
-| `compare` | Compare Pidgin vs verbose token cost |
+| `serve` | Optional HTTP API/dashboard when built with `--features server` |
 | `context-plan` | Build a context retrieval plan |
 | `doctor` | Check host configuration health |
 | `docs` | Print full protocol documentation as markdown |
@@ -134,7 +134,7 @@ The safety gate is the most important part of Pidgin. It enforces nine rules, an
                                └── result.pgn ──────┘
 ```
 
-The Python SDK (in `python/`) wraps the binary so orchestrators get typed objects without shelling out manually.
+The Python runtime (in `python/pidgin-python/`) wraps the binary so orchestrators get typed objects without shelling out manually. Framework adapters live under `python/adapters/`.
 
 ## Wiring Pidgin into Any Multi-Agent System
 

@@ -1,6 +1,6 @@
+use super::ValidationError;
 use crate::ast::{FieldValue, PgnPacket};
 use crate::registry::WorkflowRegistry;
-use super::ValidationError;
 
 pub fn validate_schema(packet: &PgnPacket, workflows: &WorkflowRegistry) -> Vec<ValidationError> {
     let mut errors = Vec::new();

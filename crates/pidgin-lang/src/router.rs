@@ -32,9 +32,19 @@ pub fn route(
     });
 
     let (recommended, fallback) = if let Some(route_val) = &explicit_route {
-        (route_val.clone(), registry.workflows.get(wf_name).map(|w| w.fallback_executor.clone()).unwrap_or_else(|| "unknown".to_string()))
+        (
+            route_val.clone(),
+            registry
+                .workflows
+                .get(wf_name)
+                .map(|w| w.fallback_executor.clone())
+                .unwrap_or_else(|| "unknown".to_string()),
+        )
     } else if let Some(entry) = registry.workflows.get(wf_name) {
-        (entry.recommended_executor.clone(), entry.fallback_executor.clone())
+        (
+            entry.recommended_executor.clone(),
+            entry.fallback_executor.clone(),
+        )
     } else {
         ("unknown".to_string(), "unknown".to_string())
     };

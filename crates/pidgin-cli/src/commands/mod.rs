@@ -3,10 +3,10 @@ use std::path::{Path, PathBuf};
 
 use pidgin_lang::ast::{FieldValue, PgnPacket};
 use pidgin_lang::expander::expand_to_run_packet;
-use pidgin_lang::logging::{log_event, LogEvent};
+use pidgin_lang::logging::{LogEvent, log_event};
 use pidgin_lang::parser::parse_packet;
 use pidgin_lang::registry::{ActionRegistry, SafetyRules, WorkflowRegistry};
-use pidgin_lang::resolver::{load_aliases, resolve_all, ResolverContext, ReferenceAliases};
+use pidgin_lang::resolver::{ReferenceAliases, ResolverContext, load_aliases, resolve_all};
 use pidgin_lang::safety::{check_resolved_refs_safety, check_safety};
 use pidgin_lang::validator::schema::validate_schema;
 use pidgin_lang::validator::syntax::validate_syntax;
@@ -26,7 +26,9 @@ pub fn load_pipeline_configs(host: &Path) -> PipelineConfig {
     let config_dir = host.join(".pidgin");
     PipelineConfig {
         workflows: load_or_exit(
-            pidgin_lang::registry::load_workflow_registry(&config_dir.join("WORKFLOW_REGISTRY.yaml")),
+            pidgin_lang::registry::load_workflow_registry(
+                &config_dir.join("WORKFLOW_REGISTRY.yaml"),
+            ),
             "workflow registry",
         ),
         actions: load_or_exit(
@@ -61,10 +63,7 @@ pub fn load_or_exit<T>(result: Result<T, impl std::fmt::Display>, label: &str) -
     }
 }
 
-pub fn get_required_inputs(
-    packet: &PgnPacket,
-    workflows: &WorkflowRegistry,
-) -> Vec<String> {
+pub fn get_required_inputs(packet: &PgnPacket, workflows: &WorkflowRegistry) -> Vec<String> {
     packet
         .fields
         .get("wf")
@@ -136,7 +135,12 @@ pub fn process_packet(
             &LogEvent::SafetyGate {
                 run_id: packet.run_id.clone(),
                 blocked: true,
-                rules: safety.fired_rules.iter().map(|r| r.to_string()).collect::<Vec<_>>().join(","),
+                rules: safety
+                    .fired_rules
+                    .iter()
+                    .map(|r| r.to_string())
+                    .collect::<Vec<_>>()
+                    .join(","),
             },
         );
         return;
@@ -287,14 +291,15 @@ common: {}
 
 pub mod check;
 pub mod context_plan;
-pub mod doctor;
 pub mod docs;
+pub mod doctor;
 pub mod expand;
 pub mod init;
 pub mod measure;
 pub mod parse;
 pub mod resolve;
 pub mod run;
+#[cfg(feature = "server")]
 pub mod serve;
 pub mod validate;
 pub mod watch;

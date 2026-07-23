@@ -59,7 +59,7 @@ Nine lines. Every field is machine-verified. No ambiguity.
 | `expand` | Produce fully-specified executable YAML packet |
 | `run` | Full pipeline — parse → validate → safety → resolve → expand |
 | `measure` | Estimate token cost of a packet |
-| `compare` | Compare Pidgin vs verbose token cost |
+| `serve` | Optional HTTP API/dashboard when built with `--features server` |
 | `context-plan` | Build a context retrieval plan |
 | `doctor` | Check host configuration health |
 | `docs` | Print full protocol documentation as markdown |

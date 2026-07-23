@@ -328,7 +328,7 @@
 //! | `expand <path>` | Full pipeline → executable YAML |
 //! | `run <path>` | Full pipeline + structured logging |
 //! | `measure <path>` | Estimate token cost |
-//! | `compare <path>` | Compare vs verbose token cost |
+//! | `serve` | Optional HTTP API/dashboard when built with `--features server` |
 //! | `context-plan <path>` | Build retrieval plan |
 //! | `doctor` | Check host configuration health |
 //! | `docs` | Print full protocol documentation |

@@ -5,8 +5,8 @@ mod expander_tests {
     use std::path::Path;
 
     use crate::ast::{Directive, FieldValue, PgnPacket};
-    use crate::expander::{expand_to_run_packet, ExpandedRef};
-    use crate::registry::{load_workflow_registry, WorkflowRegistry};
+    use crate::expander::{ExpandedRef, expand_to_run_packet};
+    use crate::registry::{WorkflowRegistry, load_workflow_registry};
     use crate::resolver::{ResolutionStatus, ResolvedRef};
     use crate::safety::SafetyResult;
 

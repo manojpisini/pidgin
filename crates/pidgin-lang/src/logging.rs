@@ -13,12 +13,32 @@ fn sanitize(s: &str) -> String {
 
 #[derive(Debug)]
 pub enum LogEvent {
-    Parse { run_id: String, ok: bool },
-    Validate { run_id: String, ok: bool },
-    SafetyGate { run_id: String, blocked: bool, rules: String },
-    Resolve { run_id: String, refs_total: usize, refs_unresolved: usize },
-    Expand { run_id: String, packet_type: String },
-    Run { run_id: String, status: String },
+    Parse {
+        run_id: String,
+        ok: bool,
+    },
+    Validate {
+        run_id: String,
+        ok: bool,
+    },
+    SafetyGate {
+        run_id: String,
+        blocked: bool,
+        rules: String,
+    },
+    Resolve {
+        run_id: String,
+        refs_total: usize,
+        refs_unresolved: usize,
+    },
+    Expand {
+        run_id: String,
+        packet_type: String,
+    },
+    Run {
+        run_id: String,
+        status: String,
+    },
 }
 
 pub fn log_event(path: &Path, event: &LogEvent) -> std::io::Result<()> {
@@ -29,10 +49,7 @@ pub fn log_event(path: &Path, event: &LogEvent) -> std::io::Result<()> {
     let timestamp = chrono_now();
     let line = format_line(timestamp, event);
 
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)?;
+    let mut file = OpenOptions::new().create(true).append(true).open(path)?;
     writeln!(file, "{}", line)?;
     Ok(())
 }
@@ -55,12 +72,26 @@ fn chrono_now() -> String {
 fn format_line(timestamp: String, event: &LogEvent) -> String {
     let line = match event {
         LogEvent::Parse { run_id, ok } => {
-            format!("[{}] PARSE {} {}", timestamp, if *ok { "OK" } else { "FAIL" }, sanitize(run_id))
+            format!(
+                "[{}] PARSE {} {}",
+                timestamp,
+                if *ok { "OK" } else { "FAIL" },
+                sanitize(run_id)
+            )
         }
         LogEvent::Validate { run_id, ok } => {
-            format!("[{}] VALIDATE {} {}", timestamp, if *ok { "OK" } else { "FAIL" }, sanitize(run_id))
+            format!(
+                "[{}] VALIDATE {} {}",
+                timestamp,
+                if *ok { "OK" } else { "FAIL" },
+                sanitize(run_id)
+            )
         }
-        LogEvent::SafetyGate { run_id, blocked, rules } => {
+        LogEvent::SafetyGate {
+            run_id,
+            blocked,
+            rules,
+        } => {
             format!(
                 "[{}] SAFETY {} {} rules=[{}]",
                 timestamp,
@@ -69,17 +100,37 @@ fn format_line(timestamp: String, event: &LogEvent) -> String {
                 sanitize(rules),
             )
         }
-        LogEvent::Resolve { run_id, refs_total, refs_unresolved } => {
+        LogEvent::Resolve {
+            run_id,
+            refs_total,
+            refs_unresolved,
+        } => {
             format!(
                 "[{}] RESOLVE {} refs={} unresolved={}",
-                timestamp, sanitize(run_id), refs_total, refs_unresolved
+                timestamp,
+                sanitize(run_id),
+                refs_total,
+                refs_unresolved
             )
         }
-        LogEvent::Expand { run_id, packet_type } => {
-            format!("[{}] EXPAND {} type={}", timestamp, sanitize(run_id), sanitize(packet_type))
+        LogEvent::Expand {
+            run_id,
+            packet_type,
+        } => {
+            format!(
+                "[{}] EXPAND {} type={}",
+                timestamp,
+                sanitize(run_id),
+                sanitize(packet_type)
+            )
         }
         LogEvent::Run { run_id, status } => {
-            format!("[{}] RUN {} status={}", timestamp, sanitize(run_id), sanitize(status))
+            format!(
+                "[{}] RUN {} status={}",
+                timestamp,
+                sanitize(run_id),
+                sanitize(status)
+            )
         }
     };
     if line.len() > MAX_LOG_LINE {

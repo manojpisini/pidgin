@@ -5,8 +5,8 @@ mod resolver_tests {
 
     use crate::ast::{Directive, FieldValue, PgnPacket};
     use crate::resolver::{
-        expand_alias, load_aliases, parse_ref, resolve_all, resolve_ref, ReferenceAliases,
-        ResolutionStatus, ResolverContext,
+        ReferenceAliases, ResolutionStatus, ResolverContext, expand_alias, load_aliases, parse_ref,
+        resolve_all, resolve_ref,
     };
 
     fn empty_aliases() -> ReferenceAliases {

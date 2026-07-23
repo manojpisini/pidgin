@@ -1,3 +1,4 @@
+pub mod schema;
 /// Validator — syntax and schema validation for parsed Pidgin packets.
 ///
 /// This module contains two sub-validators:
@@ -10,7 +11,6 @@
 /// `ValidationError` has an error `code` (for programmatic handling) and a
 /// `message` (for human-readable output).
 pub mod syntax;
-pub mod schema;
 
 #[derive(Debug, Clone)]
 pub struct ValidationError {

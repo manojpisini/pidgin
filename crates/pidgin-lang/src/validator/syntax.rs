@@ -1,5 +1,5 @@
-use crate::ast::{Directive, FieldValue, PgnPacket};
 use super::ValidationError;
+use crate::ast::{Directive, FieldValue, PgnPacket};
 
 pub fn validate_syntax(packet: &PgnPacket) -> Vec<ValidationError> {
     let mut errors = Vec::new();

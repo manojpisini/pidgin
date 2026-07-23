@@ -86,22 +86,20 @@ pub fn resolve_ref(reference: &str, ctx: &ResolverContext) -> ResolvedRef {
     // Bare alias — try to expand
     let (namespace, ref_id) = if namespace.is_empty() {
         match expand_alias(&ref_id, &ctx.aliases) {
-            Some(expanded) => {
-                match parse_ref(&expanded) {
-                    Some((ns, id)) => (ns, id),
-                    None => {
-                        return ResolvedRef {
-                            original,
-                            namespace: String::new(),
-                            ref_id: ref_id.clone(),
-                            resolved_path: None,
-                            confidence: 0.3,
-                            required,
-                            status: ResolutionStatus::Unresolved,
-                        };
-                    }
+            Some(expanded) => match parse_ref(&expanded) {
+                Some((ns, id)) => (ns, id),
+                None => {
+                    return ResolvedRef {
+                        original,
+                        namespace: String::new(),
+                        ref_id: ref_id.clone(),
+                        resolved_path: None,
+                        confidence: 0.3,
+                        required,
+                        status: ResolutionStatus::Unresolved,
+                    };
                 }
-            }
+            },
             None => {
                 return ResolvedRef {
                     original,
@@ -119,8 +117,17 @@ pub fn resolve_ref(reference: &str, ctx: &ResolverContext) -> ResolvedRef {
     };
 
     match namespace.as_str() {
-        "file" => resolve_path_ref(&original, &ref_id, &ctx.host_root, required, "file", |p| p.exists()),
-        "folder" => resolve_path_ref(&original, &ref_id, &ctx.host_root, required, "folder", |p| p.is_dir()),
+        "file" => resolve_path_ref(&original, &ref_id, &ctx.host_root, required, "file", |p| {
+            p.exists()
+        }),
+        "folder" => resolve_path_ref(
+            &original,
+            &ref_id,
+            &ctx.host_root,
+            required,
+            "folder",
+            |p| p.is_dir(),
+        ),
         _ => ResolvedRef {
             original,
             namespace,

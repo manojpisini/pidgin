@@ -2,9 +2,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use pidgin_lang::expander::expand_to_run_packet;
-use pidgin_lang::logging::{log_event, LogEvent};
+use pidgin_lang::logging::{LogEvent, log_event};
 use pidgin_lang::parser::parse_packet;
-use pidgin_lang::resolver::{resolve_all, ResolutionStatus, ResolverContext};
+use pidgin_lang::resolver::{ResolutionStatus, ResolverContext, resolve_all};
 use pidgin_lang::router::{explain_route, route};
 use pidgin_lang::safety::{check_resolved_refs_safety, check_safety};
 use pidgin_lang::validator::schema::validate_schema;

@@ -3,7 +3,7 @@
 mod safety_tests {
     use crate::parser::parse_packet;
     use crate::registry::{load_action_registry, load_safety_rules, load_workflow_registry};
-    use crate::safety::{check_safety, SafetyRuleId};
+    use crate::safety::{SafetyRuleId, check_safety};
     use std::path::Path;
 
     fn load_fixtures() -> (

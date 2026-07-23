@@ -1,8 +1,8 @@
 #[cfg(test)]
 #[allow(clippy::module_inception)]
 mod lexer_tests {
-    use crate::lexer::{header_line, field_line, list_value, scalar_value};
     use crate::ast::{Directive, FieldValue};
+    use crate::lexer::{field_line, header_line, list_value, scalar_value};
     use winnow::Parser;
 
     #[test]
@@ -39,7 +39,10 @@ mod lexer_tests {
         let result = field_line.parse_next(&mut input).unwrap();
         assert_eq!(
             result,
-            ("wf".to_string(), FieldValue::Scalar("generic_review".to_string()))
+            (
+                "wf".to_string(),
+                FieldValue::Scalar("generic_review".to_string())
+            )
         );
     }
 
@@ -74,7 +77,10 @@ mod lexer_tests {
     fn parse_list_multiple() {
         let mut input = "[a,b,c]";
         let result = list_value.parse_next(&mut input).unwrap();
-        assert_eq!(result, vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+        assert_eq!(
+            result,
+            vec!["a".to_string(), "b".to_string(), "c".to_string()]
+        );
     }
 
     #[test]
